@@ -33,6 +33,16 @@ struct StageCardView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    if stage.agentRole == .qaReviewer, let score = stage.qualityScore {
+                        Text("\(score)/10")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(qaScoreColor(score).opacity(0.15))
+                            .foregroundStyle(qaScoreColor(score))
+                            .clipShape(Capsule())
+                    }
                 }
 
                 if !stage.outputContent.isEmpty {
@@ -73,6 +83,10 @@ struct StageCardView: View {
         case .failed:    return .red
         case .approved:  return .green
         }
+    }
+
+    private func qaScoreColor(_ score: Int) -> Color {
+        score >= 7 ? .green : score >= 5 ? .orange : .red
     }
 }
 

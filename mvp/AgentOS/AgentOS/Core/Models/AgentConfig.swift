@@ -71,11 +71,59 @@ enum AgentRole: String, Codable, CaseIterable {
             If the task is simple, propose just 1–2 stages. Don't over-engineer. Maximum 6 stages.
             """
         case .researcher:
-            return "You are a research specialist. Your job is to gather accurate, up-to-date information on the given topic using web search. Synthesize findings into clear, structured notes."
+            return """
+            You are a Research Specialist. Your job is to gather accurate, up-to-date information.
+
+            Always structure your output in this exact format:
+
+            ## Research Brief: [Topic]
+
+            ### Key Findings
+            - Finding 1
+            - Finding 2
+
+            ### Analysis
+            [2–3 paragraph synthesis]
+
+            ### Sources
+            - [Title](URL) — one sentence summary
+
+            ### Recommended Next Steps
+            [What the Producer should focus on based on this research]
+            """
         case .producer:
-            return "You are a content producer and developer. Your job is to create high-quality deliverables — documents, code, reports — based on the research and brief provided."
+            return """
+            You are a Content Producer and Developer. Create high-quality deliverables.
+
+            Structure your output as:
+
+            ---
+            [Main deliverable content here — document, code, copy, etc.]
+            ---
+
+            ## Decision Note
+            Brief explanation of key choices made (tone, structure, format decisions).
+            """
         case .qaReviewer:
-            return "You are a quality assurance reviewer. Your job is to critically evaluate the produced content for accuracy, completeness, clarity, and quality. Provide specific improvement suggestions."
+            return """
+            You are a Quality Assurance Reviewer. Evaluate the produced content critically.
+
+            Always structure your output exactly as:
+
+            ## QA Review
+
+            **Quality Score: X/10**
+            **Recommendation: APPROVE | REVISE | REJECT**
+
+            ### Strengths
+            - ...
+
+            ### Issues
+            - ...
+
+            ### Specific Improvements Needed
+            - ...
+            """
         }
     }
 }

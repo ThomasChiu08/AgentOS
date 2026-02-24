@@ -53,11 +53,25 @@ enum ChatState: Equatable {
     // Injected from View via .onAppear
     var orchestrator: AgentOrchestrator?
 
+    /// True when no API key is saved for the default Anthropic provider.
+    var apiKeyMissing: Bool {
+        !KeychainHelper.hasKey(for: .anthropic)
+    }
+
     func sendMessage(modelContext: ModelContext) async {
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         // Block new messages while a proposal is awaiting approval
         guard chatState != .proposalReady else { return }
+
+        // Pre-flight: validate API key before committing message to history
+        let ceoConfig = resolvedCEOConfig(modelContext: modelContext)
+        if ceoConfig.provider.requiresAPIKey {
+            guard KeychainHelper.hasKey(for: ceoConfig.provider) else {
+                chatState = .error("API key for \(ceoConfig.provider.displayName) not set. Go to Settings → API Keys.")
+                return
+            }
+        }
 
         messages.append(ChatMessage(role: .user, content: trimmed, timestamp: Date()))
         inputText = ""
@@ -68,8 +82,6 @@ enum ChatState: Equatable {
             return
         }
 
-        // Resolve CEO config from SwiftData — falls back to Anthropic/claudeOpus defaults
-        let ceoConfig = resolvedCEOConfig(modelContext: modelContext)
         let ceoProvider = AIProviderFactory.make(for: ceoConfig.provider)
 
         do {

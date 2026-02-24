@@ -105,6 +105,20 @@ struct CEOChatView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
 
+        case .idle:
+            if viewModel.apiKeyMissing {
+                HStack(spacing: 8) {
+                    Image(systemName: "key.slash")
+                        .foregroundStyle(.orange)
+                    Text("API key not set — messages won't send.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+
         default:
             EmptyView()
         }
@@ -113,27 +127,35 @@ struct CEOChatView: View {
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 0) {
             TextField("Describe a task for your AI team…", text: $viewModel.inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...4)
-                .padding(8)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
                 .onSubmit {
                     Task { await viewModel.sendMessage(modelContext: modelContext) }
                 }
 
-            Button {
-                Task { await viewModel.sendMessage(modelContext: modelContext) }
-            } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(canSend ? .blue : .secondary)
+            HStack(spacing: 8) {
+                ModelQuickPicker()
+                Spacer()
+                Button {
+                    Task { await viewModel.sendMessage(modelContext: modelContext) }
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(canSend ? .blue : .secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSend)
             }
-            .buttonStyle(.plain)
-            .disabled(!canSend)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 6)
         }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal)
         .padding(.vertical, 10)
     }

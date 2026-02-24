@@ -99,6 +99,12 @@ final class AgentOrchestrator {
         )
 
         stage.outputContent = response.content
+
+        // Parse quality score and recommendation for QA stages
+        if stage.agentRole == .qaReviewer {
+            stage.qualityScore = QAOutputParser.extractScore(from: response.content)
+            stage.recommendation = QAOutputParser.extractRecommendation(from: response.content)
+        }
         stage.costUSD = response.costUSD
 
         // Create artifact

@@ -29,6 +29,8 @@ enum StageStatus: String, Codable {
     var outputContent: String
     var costUSD: Double
     var approved: Bool
+    var qualityScore: Int?
+    var recommendation: String?
     var position: Int
     var createdAt: Date
 

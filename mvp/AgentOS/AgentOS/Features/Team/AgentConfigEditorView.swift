@@ -26,6 +26,11 @@ struct AgentConfigEditorView: View {
                         }
                     }
 
+                    HStack {
+                        Spacer()
+                        ModelTierBadge(model: config.model)
+                    }
+
                     // Warning if no key is saved for this provider
                     if !KeychainHelper.hasKey(for: config.provider) {
                         Label(
