@@ -19,16 +19,25 @@ struct AgentConfigEditorView: View {
                         }
                     }
 
-                    // Level 2: Model picker filtered to selected provider
-                    Picker("Model", selection: $config.model) {
+                    // Level 2: Model picker filtered to selected provider, plus "Custom…" option
+                    Picker("Model", selection: modelPickerBinding) {
                         ForEach(config.provider.models, id: \.self) { model in
-                            Text(model.displayName).tag(model)
+                            Text(model.displayName).tag(model.rawValue)
                         }
+                        Divider()
+                        Text("Custom…").tag("custom")
+                    }
+
+                    // Custom model text field — shown when not a known preset for current provider
+                    if config.knownModel == nil || config.knownModel?.provider != config.provider {
+                        TextField("e.g. gpt-oss:20b", text: $config.modelIdentifier)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption.monospaced())
                     }
 
                     HStack {
                         Spacer()
-                        ModelTierBadge(model: config.model)
+                        ModelTierBadge(modelIdentifier: config.modelIdentifier)
                     }
 
                     // Warning if no key is saved for this provider
@@ -62,7 +71,7 @@ struct AgentConfigEditorView: View {
             HStack {
                 Button("Reset to Default") {
                     config.systemPrompt = config.role.systemPromptTemplate
-                    config.model = config.role.defaultModel
+                    config.modelIdentifier = config.role.defaultModelIdentifier
                     config.provider = .anthropic
                     config.temperature = 0.7
                     config.name = config.role.rawValue
@@ -71,8 +80,16 @@ struct AgentConfigEditorView: View {
 
                 Spacer()
 
-                Button("Done") { dismiss() }
-                    .buttonStyle(.borderedProminent)
+                Button("Done") {
+                    // Prevent saving an empty custom model identifier
+                    guard !config.modelIdentifier.trimmingCharacters(in: .whitespaces).isEmpty else {
+                        config.modelIdentifier = config.role.defaultModelIdentifier
+                        dismiss()
+                        return
+                    }
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
             }
             .padding()
         }
@@ -88,8 +105,30 @@ struct AgentConfigEditorView: View {
             get: { config.provider },
             set: { newProvider in
                 config.provider = newProvider
-                if config.model.provider != newProvider {
-                    config.model = newProvider.defaultModel
+                if config.knownModel?.provider != newProvider {
+                    config.modelIdentifier = newProvider.defaultModelIdentifier
+                }
+            }
+        )
+    }
+
+    // MARK: - Model Picker Binding
+
+    /// Maps modelIdentifier to Picker selection: known preset → rawValue, custom → "custom".
+    private var modelPickerBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let known = config.knownModel, known.provider == config.provider else {
+                    return "custom"
+                }
+                return config.modelIdentifier
+            },
+            set: { value in
+                if value == "custom" {
+                    // Clear identifier so the user can type a custom name
+                    config.modelIdentifier = ""
+                } else {
+                    config.modelIdentifier = value
                 }
             }
         )

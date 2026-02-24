@@ -88,7 +88,7 @@ enum ChatState: Equatable {
             let response = try await ceoProvider.complete(
                 systemPrompt: ceoConfig.systemPrompt,   // use AgentConfig prompt, not hardcoded
                 userMessage: trimmed,
-                model: ceoConfig.model,
+                modelIdentifier: ceoConfig.modelIdentifier,
                 temperature: ceoConfig.temperature
             )
 

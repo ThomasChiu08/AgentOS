@@ -1,14 +1,16 @@
 import SwiftUI
 
 struct ModelTierBadge: View {
-    let model: AIModel
+    let modelIdentifier: String
 
     private var tier: (label: String, color: Color) {
-        switch model {
+        switch AIModel(rawValue: modelIdentifier) {
         case .claudeHaiku, .gpt4oMini, .llama318b, .llama32, .mistral7b, .gemini20Flash:
             return ("Speed", .green)
         case .claudeOpus, .o1Preview, .deepSeekReasoner:
             return ("Power", .purple)
+        case nil:
+            return ("Custom", .teal)
         default:
             return ("Balanced", .blue)
         }

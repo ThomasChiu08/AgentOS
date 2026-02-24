@@ -2,21 +2,44 @@ import SwiftUI
 import SwiftData
 
 /// Compact model selector for CEO Chat input bar.
-/// Reads and writes the CEO agent's model directly in SwiftData.
+/// Uses @Query for reactive SwiftData observation — stays in sync with AgentConfigEditorView changes.
 struct ModelQuickPicker: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var currentModel: AIModel = .claudeOpus
+    // Fetch all, filter in-memory — avoids #Predicate rawValue issues with enum properties.
+    @Query private var allConfigs: [AgentConfig]
+
+    private var ceoConfig: AgentConfig? {
+        allConfigs.first(where: { $0.role == .ceo })
+    }
+
+    private var modelIdentifier: String {
+        ceoConfig?.modelIdentifier ?? AIModel.claudeOpus.rawValue
+    }
+
+    private var currentProvider: AIProvider {
+        ceoConfig?.provider ?? .anthropic
+    }
+
+    private var displayName: String {
+        AIModel(rawValue: modelIdentifier)?.displayName ?? modelIdentifier
+    }
 
     var body: some View {
         Menu {
-            ForEach(AIModel.allCases.filter { $0.provider == currentModel.provider }, id: \.self) { model in
+            // If current model is custom (unknown preset), show it disabled as a header
+            if AIModel(rawValue: modelIdentifier) == nil && !modelIdentifier.isEmpty {
+                Button(modelIdentifier) { }.disabled(true)
+                Divider()
+            }
+
+            ForEach(currentProvider.models, id: \.self) { model in
                 Button(model.displayName) {
                     updateModel(to: model)
                 }
             }
         } label: {
             HStack(spacing: 4) {
-                Text(currentModel.displayName)
+                Text(displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Image(systemName: "chevron.up.chevron.down")
@@ -25,24 +48,16 @@ struct ModelQuickPicker: View {
             }
         }
         .menuStyle(.borderlessButton)
-        .onAppear { loadCurrentModel() }
-    }
-
-    private func loadCurrentModel() {
-        let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
-        if let saved = all.first(where: { $0.role == .ceo }) {
-            currentModel = saved.model
-        }
     }
 
     private func updateModel(to model: AIModel) {
-        currentModel = model
-        let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
-        if let config = all.first(where: { $0.role == .ceo }) {
-            config.model = model
+        if let config = ceoConfig {
+            config.modelIdentifier = model.rawValue
+            config.providerName = model.provider.rawValue
         } else {
             let config = AgentConfig(role: .ceo)
-            config.model = model
+            config.modelIdentifier = model.rawValue
+            config.providerName = model.provider.rawValue
             modelContext.insert(config)
         }
     }

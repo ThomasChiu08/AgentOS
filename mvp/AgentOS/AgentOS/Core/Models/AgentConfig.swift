@@ -18,10 +18,10 @@ enum AgentRole: String, Codable, CaseIterable {
         }
     }
 
-    var defaultModel: AIModel {
+    var defaultModelIdentifier: String {
         switch self {
-        case .ceo: return .claudeOpus
-        case .researcher, .producer, .qaReviewer: return .claudeSonnet
+        case .ceo: return AIModel.claudeOpus.rawValue
+        case .researcher, .producer, .qaReviewer: return AIModel.claudeSonnet.rawValue
         }
     }
 
@@ -169,19 +169,19 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         "agentos.\(rawValue).apikey"
     }
 
-    /// The default model for this provider.
-    var defaultModel: AIModel {
+    /// The default model identifier for this provider.
+    var defaultModelIdentifier: String {
         switch self {
-        case .anthropic: return .claudeSonnet
-        case .openai:    return .gpt4o
-        case .ollama:    return .llama32
-        case .qwen:      return .qwenMax
-        case .minimax:   return .minimaxText01
-        case .gemini:    return .gemini20Flash
-        case .deepseek:  return .deepSeekChat
-        case .groq:      return .llama3370b
-        case .mistral:   return .mistralLarge
-        case .cohere:    return .commandRPlus
+        case .anthropic: return AIModel.claudeSonnet.rawValue
+        case .openai:    return AIModel.gpt4o.rawValue
+        case .ollama:    return AIModel.llama32.rawValue
+        case .qwen:      return AIModel.qwenMax.rawValue
+        case .minimax:   return AIModel.minimaxText01.rawValue
+        case .gemini:    return AIModel.gemini20Flash.rawValue
+        case .deepseek:  return AIModel.deepSeekChat.rawValue
+        case .groq:      return AIModel.llama3370b.rawValue
+        case .mistral:   return AIModel.mistralLarge.rawValue
+        case .cohere:    return AIModel.commandRPlus.rawValue
         }
     }
 
@@ -300,7 +300,8 @@ enum AIModel: String, Codable, CaseIterable {
     var role: AgentRole
     var name: String
     var systemPrompt: String
-    var model: AIModel
+    /// Stored model identity — persisted as String to support arbitrary/custom model names.
+    var modelIdentifier: String
     var temperature: Double
     /// Stored provider identity — persisted as String for SwiftData lightweight migration.
     var providerName: String
@@ -311,12 +312,18 @@ enum AIModel: String, Codable, CaseIterable {
         set { providerName = newValue.rawValue }
     }
 
+    /// Returns the known AIModel enum case if modelIdentifier matches a preset, nil for custom models.
+    var knownModel: AIModel? { AIModel(rawValue: modelIdentifier) }
+
+    /// Display name: preset model's name or the raw identifier for custom models.
+    var modelDisplayName: String { knownModel?.displayName ?? modelIdentifier }
+
     init(role: AgentRole) {
         self.id = UUID()
         self.role = role
         self.name = role.rawValue
         self.systemPrompt = role.systemPromptTemplate
-        self.model = role.defaultModel
+        self.modelIdentifier = role.defaultModelIdentifier
         self.temperature = 0.7
         self.providerName = AIProvider.anthropic.rawValue
     }

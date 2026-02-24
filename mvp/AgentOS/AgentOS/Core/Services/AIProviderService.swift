@@ -113,7 +113,7 @@ protocol AIProviderProtocol: Sendable {
     func complete(
         systemPrompt: String,
         userMessage: String,
-        model: AIModel,
+        modelIdentifier: String,
         temperature: Double
     ) async throws -> AIResponse
 }
@@ -161,7 +161,7 @@ struct ClaudeProvider: AIProviderProtocol {
     func complete(
         systemPrompt: String,
         userMessage: String,
-        model: AIModel,
+        modelIdentifier: String,
         temperature: Double
     ) async throws -> AIResponse {
         guard let apiKey = KeychainHelper[.anthropic], !apiKey.isEmpty else {
@@ -175,7 +175,7 @@ struct ClaudeProvider: AIProviderProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
-            "model": model.rawValue,
+            "model": modelIdentifier,
             "max_tokens": 4096,
             "temperature": temperature,
             "system": systemPrompt,
@@ -196,7 +196,7 @@ struct ClaudeProvider: AIProviderProtocol {
 
         switch http.statusCode {
         case 200:
-            return try parseAnthropicResponse(data: data, model: model)
+            return try parseAnthropicResponse(data: data, modelIdentifier: modelIdentifier)
         case 401:
             throw AIProviderError.missingAPIKey(.anthropic)
         case 429:
@@ -206,7 +206,7 @@ struct ClaudeProvider: AIProviderProtocol {
         }
     }
 
-    private func parseAnthropicResponse(data: Data, model: AIModel) throws -> AIResponse {
+    private func parseAnthropicResponse(data: Data, modelIdentifier: String) throws -> AIResponse {
         guard
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let contentArr = json["content"] as? [[String: Any]],
@@ -218,8 +218,9 @@ struct ClaudeProvider: AIProviderProtocol {
             throw AIProviderError.invalidResponse
         }
 
-        let cost = (Double(inputTokens) / 1_000_000) * model.inputPricePerMillion
-                 + (Double(outputTokens) / 1_000_000) * model.outputPricePerMillion
+        let knownModel = AIModel(rawValue: modelIdentifier)
+        let cost = (Double(inputTokens) / 1_000_000) * (knownModel?.inputPricePerMillion ?? 0)
+                 + (Double(outputTokens) / 1_000_000) * (knownModel?.outputPricePerMillion ?? 0)
 
         return AIResponse(
             content: text,
@@ -239,7 +240,7 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
     func complete(
         systemPrompt: String,
         userMessage: String,
-        model: AIModel,
+        modelIdentifier: String,
         temperature: Double
     ) async throws -> AIResponse {
         // Ollama doesn't require a key; all others do.
@@ -258,7 +259,7 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
         }
 
         let body: [String: Any] = [
-            "model": model.rawValue,
+            "model": modelIdentifier,
             "temperature": temperature,
             "messages": [
                 ["role": "system", "content": systemPrompt],
@@ -280,7 +281,7 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
 
         switch http.statusCode {
         case 200:
-            return try parseOpenAIResponse(data: data, model: model)
+            return try parseOpenAIResponse(data: data, modelIdentifier: modelIdentifier)
         case 401:
             throw AIProviderError.missingAPIKey(provider)
         case 429:
@@ -290,7 +291,7 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
         }
     }
 
-    private func parseOpenAIResponse(data: Data, model: AIModel) throws -> AIResponse {
+    private func parseOpenAIResponse(data: Data, modelIdentifier: String) throws -> AIResponse {
         // OpenAI response shape:
         // { "choices": [{"message": {"content": "..."}}],
         //   "usage": {"prompt_tokens": N, "completion_tokens": N} }
@@ -310,8 +311,9 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
             outputTokens = usage["completion_tokens"] as? Int ?? 0
         }
 
-        let cost = (Double(inputTokens) / 1_000_000) * model.inputPricePerMillion
-                 + (Double(outputTokens) / 1_000_000) * model.outputPricePerMillion
+        let knownModel = AIModel(rawValue: modelIdentifier)
+        let cost = (Double(inputTokens) / 1_000_000) * (knownModel?.inputPricePerMillion ?? 0)
+                 + (Double(outputTokens) / 1_000_000) * (knownModel?.outputPricePerMillion ?? 0)
 
         return AIResponse(
             content: text,

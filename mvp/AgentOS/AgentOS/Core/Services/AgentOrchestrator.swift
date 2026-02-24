@@ -94,7 +94,7 @@ final class AgentOrchestrator {
         let response = try await stageProvider.complete(
             systemPrompt: config.systemPrompt,
             userMessage: context,
-            model: config.model,
+            modelIdentifier: config.modelIdentifier,
             temperature: config.temperature
         )
 

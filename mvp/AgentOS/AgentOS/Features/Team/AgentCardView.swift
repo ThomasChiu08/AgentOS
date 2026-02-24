@@ -30,7 +30,7 @@ struct AgentCardView: View {
                 Image(systemName: "cpu")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(config.model.displayName)
+                Text(config.modelDisplayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
