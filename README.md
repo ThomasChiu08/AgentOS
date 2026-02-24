@@ -20,7 +20,7 @@ Most solopreneurs are capable of incredible things — but they're bottlenecked 
 
 ```bash
 # 1. Clone
-git clone https://github.com/thomaschiu/AgentOS.git && cd AgentOS
+git clone https://github.com/ThomasChiu08/AgentOS.git && cd AgentOS
 
 # 2. Open MVP in Xcode
 open mvp/AgentOS/AgentOS.xcodeproj
