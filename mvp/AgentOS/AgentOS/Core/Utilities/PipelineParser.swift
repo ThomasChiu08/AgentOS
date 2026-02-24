@@ -1,0 +1,95 @@
+import Foundation
+import SwiftData
+
+// MARK: - Parsed Intermediate Types
+
+struct ParsedStage {
+    let role: AgentRole
+    let task: String
+    let researchURLs: [URL]
+}
+
+struct ParsedPipeline {
+    let stages: [ParsedStage]
+}
+
+// MARK: - PipelineParser
+
+enum PipelineParser {
+
+    /// Extracts a pipeline plan from CEO text output.
+    /// Returns nil if no valid JSON block found (conversational response).
+    static func parse(_ text: String) -> ParsedPipeline? {
+        guard
+            let jsonString = extractJSONBlock(from: text),
+            let data = jsonString.data(using: .utf8),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let pipelineArray = json["pipeline"] as? [[String: Any]]
+        else { return nil }
+
+        let stages = pipelineArray.compactMap { item -> ParsedStage? in
+            guard
+                let roleString = item["role"] as? String,
+                let role = parseRole(roleString),
+                let task = item["task"] as? String
+            else { return nil }
+
+            let urls = (item["researchURLs"] as? [String] ?? [])
+                .compactMap { URL(string: $0) }
+
+            return ParsedStage(role: role, task: task, researchURLs: urls)
+        }
+
+        guard !stages.isEmpty else { return nil }
+        return ParsedPipeline(stages: stages)
+    }
+
+    /// Creates SwiftData Stage objects from a parsed pipeline.
+    static func buildStages(from parsed: ParsedPipeline, pipeline: Pipeline) -> [Stage] {
+        parsed.stages.enumerated().map { index, parsedStage in
+            // Embed research URLs into the inputContext so the researcher stage can find them
+            var context = parsedStage.task
+            if !parsedStage.researchURLs.isEmpty {
+                let urlList = parsedStage.researchURLs.map { $0.absoluteString }.joined(separator: "\n")
+                context += "\n\nResearch URLs:\n\(urlList)"
+            }
+
+            let stage = Stage(agentRole: parsedStage.role, position: index, inputContext: context)
+            stage.pipeline = pipeline
+            return stage
+        }
+    }
+
+    // MARK: - Private
+
+    /// Maps CEO JSON role strings (lowercase camelCase) to AgentRole enum cases.
+    private static func parseRole(_ string: String) -> AgentRole? {
+        switch string {
+        case "researcher":         return .researcher
+        case "producer":           return .producer
+        case "qaReviewer",
+             "qa_reviewer",
+             "qa reviewer",
+             "reviewer":           return .qaReviewer
+        default:                   return nil
+        }
+    }
+
+    /// Extracts the JSON block from CEO output (```json ... ``` or bare { ... }).
+    private static func extractJSONBlock(from text: String) -> String? {
+        // Try ```json ... ``` first
+        let fencedPattern = "```(?:json)?\\s*([\\s\\S]*?)```"
+        if let regex = try? NSRegularExpression(pattern: fencedPattern),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let range = Range(match.range(at: 1), in: text) {
+            return String(text[range])
+        }
+
+        // Fallback: find outermost { } pair
+        guard let start = text.firstIndex(of: "{"),
+              let end = text.lastIndex(of: "}")
+        else { return nil }
+
+        return start <= end ? String(text[start...end]) : nil
+    }
+}
