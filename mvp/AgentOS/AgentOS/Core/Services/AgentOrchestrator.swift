@@ -141,16 +141,8 @@ final class AgentOrchestrator {
     /// Fetches the saved AgentConfig for a given role from SwiftData.
     /// Falls back to a default config if none is persisted.
     private func resolvedConfig(for role: AgentRole) -> AgentConfig {
-        // #Predicate can't compare enum values directly; use rawValue.
-        let roleRaw = role.rawValue
-        var descriptor = FetchDescriptor<AgentConfig>(
-            predicate: #Predicate { $0.role.rawValue == roleRaw }
-        )
-        descriptor.fetchLimit = 1
-        if let saved = try? modelContext.fetch(descriptor).first {
-            return saved
-        }
-        return AgentConfig(role: role)
+        let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
+        return all.first(where: { $0.role == role }) ?? AgentConfig(role: role)
     }
 
     // MARK: - Approval Suspension

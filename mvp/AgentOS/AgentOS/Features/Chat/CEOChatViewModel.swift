@@ -152,15 +152,7 @@ enum ChatState: Equatable {
     // MARK: - Private
 
     private func resolvedCEOConfig(modelContext: ModelContext) -> AgentConfig {
-        // #Predicate can't reference static enum cases; capture the rawValue first.
-        let roleRaw = AgentRole.ceo.rawValue
-        var descriptor = FetchDescriptor<AgentConfig>(
-            predicate: #Predicate { $0.role.rawValue == roleRaw }
-        )
-        descriptor.fetchLimit = 1
-        if let saved = try? modelContext.fetch(descriptor).first {
-            return saved
-        }
-        return AgentConfig(role: .ceo)
+        let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
+        return all.first(where: { $0.role == .ceo }) ?? AgentConfig(role: .ceo)
     }
 }

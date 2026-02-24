@@ -29,24 +29,16 @@ struct ModelQuickPicker: View {
     }
 
     private func loadCurrentModel() {
-        let roleRaw = AgentRole.ceo.rawValue
-        var descriptor = FetchDescriptor<AgentConfig>(
-            predicate: #Predicate { $0.role.rawValue == roleRaw }
-        )
-        descriptor.fetchLimit = 1
-        if let saved = try? modelContext.fetch(descriptor).first {
+        let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
+        if let saved = all.first(where: { $0.role == .ceo }) {
             currentModel = saved.model
         }
     }
 
     private func updateModel(to model: AIModel) {
         currentModel = model
-        let roleRaw = AgentRole.ceo.rawValue
-        var descriptor = FetchDescriptor<AgentConfig>(
-            predicate: #Predicate { $0.role.rawValue == roleRaw }
-        )
-        descriptor.fetchLimit = 1
-        if let config = try? modelContext.fetch(descriptor).first {
+        let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
+        if let config = all.first(where: { $0.role == .ceo }) {
             config.model = model
         } else {
             let config = AgentConfig(role: .ceo)
