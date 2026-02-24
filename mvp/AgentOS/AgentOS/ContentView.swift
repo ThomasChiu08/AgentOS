@@ -24,6 +24,7 @@ enum SidebarItem: String, CaseIterable, Hashable {
 
 struct ContentView: View {
     @State private var selection: SidebarItem? = .chat
+    @State private var selectedProjectID: UUID?
 
     var body: some View {
         NavigationSplitView {
@@ -36,7 +37,13 @@ struct ContentView: View {
             Group {
                 switch selection {
                 case .chat:
-                    CEOChatView()
+                    HSplitView {
+                        ProjectListView(
+                            selectedProjectID: $selectedProjectID,
+                            onNewTask: { selectedProjectID = nil }
+                        )
+                        CEOChatView(selectedProjectID: $selectedProjectID)
+                    }
                 case .pipeline:
                     PipelineBoardView()
                 case .artifacts:

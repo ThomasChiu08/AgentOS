@@ -149,6 +149,48 @@ enum ChatState: Equatable {
         messages = []
     }
 
+    /// Loads an existing project from history into the chat view.
+    func loadProject(id: UUID, modelContext: ModelContext) {
+        // Don't reload if already showing this project
+        if currentProject?.id == id { return }
+
+        let project: Project
+        do {
+            let all = try modelContext.fetch(FetchDescriptor<Project>())
+            guard let found = all.first(where: { $0.id == id }) else {
+                chatState = .error("Project not found.")
+                return
+            }
+            project = found
+        } catch {
+            chatState = .error("Failed to load project: \(error.localizedDescription)")
+            return
+        }
+
+        messages = []
+        currentProject = project
+        currentPipeline = project.pipeline
+
+        messages.append(ChatMessage(
+            role: .ceo,
+            content: "Loaded project: \(project.title)",
+            timestamp: project.createdAt
+        ))
+
+        switch project.status {
+        case .completed:
+            chatState = .completed
+        case .failed:
+            chatState = .error("Pipeline failed — check Pipeline Board for details.")
+        case .running:
+            chatState = .pipelineRunning
+        case .idle:
+            chatState = project.pipeline != nil ? .proposalReady : .idle
+        case .paused:
+            chatState = .proposalReady
+        }
+    }
+
     // MARK: - Private
 
     private func resolvedCEOConfig(modelContext: ModelContext) -> AgentConfig {

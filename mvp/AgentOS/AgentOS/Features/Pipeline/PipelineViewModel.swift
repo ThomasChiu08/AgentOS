@@ -28,6 +28,10 @@ import SwiftData
         pipeline.project?.title ?? "Untitled Pipeline"
     }
 
+    var currentError: Error? {
+        orchestrator.currentError
+    }
+
     func approve(stage: Stage) {
         orchestrator.approveCurrent(stage: stage)
     }

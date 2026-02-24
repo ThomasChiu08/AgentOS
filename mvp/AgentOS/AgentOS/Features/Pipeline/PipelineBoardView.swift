@@ -33,6 +33,9 @@ private struct PipelineContent: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
+            if let error = viewModel.currentError {
+                errorBanner(error)
+            }
             Divider()
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -48,6 +51,23 @@ private struct PipelineContent: View {
             }
         }
         .navigationTitle("Pipeline Board")
+    }
+
+    // MARK: - Error Banner
+
+    private func errorBanner(_ error: Error) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+            Text(error.localizedDescription)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .lineLimit(2)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+        .background(Color.red.opacity(0.08))
     }
 
     // MARK: - Toolbar

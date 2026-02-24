@@ -133,6 +133,7 @@ enum AIProviderError: LocalizedError {
     case missingAPIKey(AIProvider)
     case invalidResponse
     case rateLimited
+    case timeout
     case serverError(Int)
     case networkError(Error)
 
@@ -144,6 +145,8 @@ enum AIProviderError: LocalizedError {
             return "Unexpected response from AI provider."
         case .rateLimited:
             return "Rate limit reached. Please wait and try again."
+        case .timeout:
+            return "Request timed out. The AI provider may be slow — try again."
         case .serverError(let code):
             return "Server error (\(code)). Please try again."
         case .networkError(let err):
@@ -168,7 +171,7 @@ struct ClaudeProvider: AIProviderProtocol {
             throw AIProviderError.missingAPIKey(.anthropic)
         }
 
-        var request = URLRequest(url: endpoint)
+        var request = URLRequest(url: endpoint, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
@@ -186,6 +189,8 @@ struct ClaudeProvider: AIProviderProtocol {
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            throw AIProviderError.timeout
         } catch {
             throw AIProviderError.networkError(error)
         }
@@ -250,7 +255,7 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
             }
         }
 
-        var request = URLRequest(url: provider.chatCompletionURL)
+        var request = URLRequest(url: provider.chatCompletionURL, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -271,6 +276,8 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            throw AIProviderError.timeout
         } catch {
             throw AIProviderError.networkError(error)
         }

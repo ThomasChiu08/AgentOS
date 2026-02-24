@@ -32,9 +32,31 @@ struct ModelQuickPicker: View {
                 Divider()
             }
 
+            // Current provider's models (quick access)
             ForEach(currentProvider.models, id: \.self) { model in
-                Button(model.displayName) {
+                Button {
                     updateModel(to: model)
+                } label: {
+                    if model.rawValue == modelIdentifier {
+                        Label(model.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(model.displayName)
+                    }
+                }
+            }
+
+            Divider()
+
+            // Other providers as submenus
+            Menu("Switch Provider") {
+                ForEach(AIProvider.allCases) { provider in
+                    Menu(provider.displayName) {
+                        ForEach(provider.models, id: \.self) { model in
+                            Button(model.displayName) {
+                                updateModel(to: model)
+                            }
+                        }
+                    }
                 }
             }
         } label: {

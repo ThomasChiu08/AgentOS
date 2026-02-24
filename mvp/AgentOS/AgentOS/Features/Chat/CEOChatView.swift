@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct CEOChatView: View {
+    @Binding var selectedProjectID: UUID?
     @Environment(AgentOrchestrator.self) var orchestrator
     @Environment(\.modelContext) var modelContext
     @State private var viewModel = CEOChatViewModel()
+    @State private var isSyncingProjectID = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,6 +16,22 @@ struct CEOChatView: View {
         }
         .navigationTitle("CEO Chat")
         .onAppear { viewModel.orchestrator = orchestrator }
+        .onChange(of: selectedProjectID) { _, newID in
+            guard !isSyncingProjectID else { return }
+            isSyncingProjectID = true
+            defer { isSyncingProjectID = false }
+            if let newID {
+                viewModel.loadProject(id: newID, modelContext: modelContext)
+            } else {
+                viewModel.reset()
+            }
+        }
+        .onChange(of: viewModel.currentProject?.id) { _, newID in
+            guard !isSyncingProjectID, let newID, newID != selectedProjectID else { return }
+            isSyncingProjectID = true
+            defer { isSyncingProjectID = false }
+            selectedProjectID = newID
+        }
     }
 
     // MARK: - Message List
@@ -28,6 +46,9 @@ struct CEOChatView: View {
                     }
                     if viewModel.chatState == .waitingForCEO {
                         TypingIndicator()
+                    }
+                    if viewModel.chatState == .pipelineRunning {
+                        PipelineRunningIndicator()
                     }
                 }
                 .padding()
@@ -237,6 +258,20 @@ private struct TypingIndicator: View {
         HStack(spacing: 8) {
             ProgressView().scaleEffect(0.6)
             Text("CEO is planning…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.leading, 4)
+    }
+}
+
+// MARK: - Pipeline Running Indicator
+
+private struct PipelineRunningIndicator: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().scaleEffect(0.6)
+            Text("Agents working…")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

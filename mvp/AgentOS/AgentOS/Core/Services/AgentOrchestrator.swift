@@ -50,6 +50,7 @@ final class AgentOrchestrator {
         } catch {
             currentError = error
             pipeline.project?.status = .failed
+            try? modelContext.save()
         }
 
         isRunning = false
