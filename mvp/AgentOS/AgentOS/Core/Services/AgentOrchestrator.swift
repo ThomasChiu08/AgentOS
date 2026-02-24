@@ -15,7 +15,6 @@ final class AgentOrchestrator {
 
     // MARK: - Dependencies
 
-    let provider: any AIProviderProtocol
     let modelContext: ModelContext
 
     // MARK: - Private
@@ -24,9 +23,8 @@ final class AgentOrchestrator {
 
     // MARK: - Init
 
-    init(modelContext: ModelContext, provider: any AIProviderProtocol = ClaudeProvider()) {
+    init(modelContext: ModelContext) {
         self.modelContext = modelContext
-        self.provider = provider
     }
 
     // MARK: - Public API
@@ -89,9 +87,11 @@ final class AgentOrchestrator {
             }
         }
 
-        let config = AgentConfig(role: stage.agentRole)
+        // Resolve per-agent config from SwiftData (falls back to defaults)
+        let config = resolvedConfig(for: stage.agentRole)
+        let stageProvider = AIProviderFactory.make(for: config.provider)
 
-        let response = try await provider.complete(
+        let response = try await stageProvider.complete(
             systemPrompt: config.systemPrompt,
             userMessage: context,
             model: config.model,
@@ -128,6 +128,23 @@ final class AgentOrchestrator {
         } else {
             stage.status = .completed
         }
+    }
+
+    // MARK: - Config Resolution
+
+    /// Fetches the saved AgentConfig for a given role from SwiftData.
+    /// Falls back to a default config if none is persisted.
+    private func resolvedConfig(for role: AgentRole) -> AgentConfig {
+        // #Predicate can't compare enum values directly; use rawValue.
+        let roleRaw = role.rawValue
+        var descriptor = FetchDescriptor<AgentConfig>(
+            predicate: #Predicate { $0.role.rawValue == roleRaw }
+        )
+        descriptor.fetchLimit = 1
+        if let saved = try? modelContext.fetch(descriptor).first {
+            return saved
+        }
+        return AgentConfig(role: role)
     }
 
     // MARK: - Approval Suspension

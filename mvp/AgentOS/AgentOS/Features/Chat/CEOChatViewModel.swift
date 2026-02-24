@@ -90,12 +90,16 @@ enum ChatState: Equatable {
             return
         }
 
+        // Resolve CEO config from SwiftData — falls back to Anthropic/claudeOpus defaults
+        let ceoConfig = resolvedCEOConfig(modelContext: modelContext)
+        let ceoProvider = AIProviderFactory.make(for: ceoConfig.provider)
+
         do {
-            let response = try await orchestrator.provider.complete(
+            let response = try await ceoProvider.complete(
                 systemPrompt: ceoSystemPrompt,
                 userMessage: trimmed,
-                model: .claudeOpus,
-                temperature: 0.7
+                model: ceoConfig.model,
+                temperature: ceoConfig.temperature
             )
 
             messages.append(ChatMessage(role: .ceo, content: response.content, timestamp: Date()))
@@ -148,5 +152,20 @@ enum ChatState: Equatable {
         chatState = .idle
         currentProject = nil
         currentPipeline = nil
+    }
+
+    // MARK: - Private
+
+    private func resolvedCEOConfig(modelContext: ModelContext) -> AgentConfig {
+        // #Predicate can't reference static enum cases; capture the rawValue first.
+        let roleRaw = AgentRole.ceo.rawValue
+        var descriptor = FetchDescriptor<AgentConfig>(
+            predicate: #Predicate { $0.role.rawValue == roleRaw }
+        )
+        descriptor.fetchLimit = 1
+        if let saved = try? modelContext.fetch(descriptor).first {
+            return saved
+        }
+        return AgentConfig(role: .ceo)
     }
 }

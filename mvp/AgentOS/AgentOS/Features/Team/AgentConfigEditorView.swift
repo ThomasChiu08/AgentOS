@@ -11,13 +11,30 @@ struct AgentConfigEditorView: View {
                     TextField("Display Name", text: $config.name)
                 }
 
-                Section("Model") {
+                Section("Provider & Model") {
+                    // Level 1: Provider picker
+                    Picker("Provider", selection: providerBinding) {
+                        ForEach(AIProvider.allCases) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+
+                    // Level 2: Model picker filtered to selected provider
                     Picker("Model", selection: $config.model) {
-                        ForEach(AIModel.allCases, id: \.self) { model in
+                        ForEach(config.provider.models, id: \.self) { model in
                             Text(model.displayName).tag(model)
                         }
                     }
-                    .pickerStyle(.segmented)
+
+                    // Warning if no key is saved for this provider
+                    if !KeychainHelper.hasKey(for: config.provider) {
+                        Label(
+                            "No API key saved for \(config.provider.displayName). Add it in Settings.",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                    }
 
                     HStack {
                         Text("Temperature")
@@ -41,6 +58,7 @@ struct AgentConfigEditorView: View {
                 Button("Reset to Default") {
                     config.systemPrompt = config.role.systemPromptTemplate
                     config.model = config.role.defaultModel
+                    config.provider = .anthropic
                     config.temperature = 0.7
                     config.name = config.role.rawValue
                 }
@@ -53,6 +71,22 @@ struct AgentConfigEditorView: View {
             }
             .padding()
         }
-        .frame(minWidth: 500, minHeight: 400)
+        .frame(minWidth: 500, minHeight: 420)
+    }
+
+    // MARK: - Provider Binding
+
+    /// When the provider changes, auto-snap the model to the new provider's default
+    /// if the current model doesn't belong to the new provider.
+    private var providerBinding: Binding<AIProvider> {
+        Binding(
+            get: { config.provider },
+            set: { newProvider in
+                config.provider = newProvider
+                if config.model.provider != newProvider {
+                    config.model = newProvider.defaultModel
+                }
+            }
+        )
     }
 }

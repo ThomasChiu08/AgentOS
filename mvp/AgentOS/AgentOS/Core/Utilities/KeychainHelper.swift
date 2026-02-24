@@ -5,6 +5,8 @@ enum KeychainHelper {
     private static let service = "com.thomas.agentos"
     private static let apiKeyAccount = "anthropic.apikey"
 
+    // MARK: - Legacy (Anthropic only) — preserved for backward compatibility
+
     static var apiKey: String? {
         get { read(account: apiKeyAccount) }
         set {
@@ -14,6 +16,29 @@ enum KeychainHelper {
                 delete(account: apiKeyAccount)
             }
         }
+    }
+
+    // MARK: - Per-provider subscript
+
+    static subscript(provider: AIProvider) -> String? {
+        get {
+            // Anthropic maps to the legacy account so existing keys survive
+            let account = provider == .anthropic ? apiKeyAccount : provider.keychainAccount
+            return read(account: account)
+        }
+        set {
+            let account = provider == .anthropic ? apiKeyAccount : provider.keychainAccount
+            if let value = newValue, !value.isEmpty {
+                save(value, account: account)
+            } else {
+                delete(account: account)
+            }
+        }
+    }
+
+    /// Returns true if a key exists (or isn't required) for the given provider.
+    static func hasKey(for provider: AIProvider) -> Bool {
+        !provider.requiresAPIKey || self[provider] != nil
     }
 
     // MARK: - Private
@@ -30,7 +55,7 @@ enum KeychainHelper {
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    private static func read(account: String) -> String? {
+    static func read(account: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,

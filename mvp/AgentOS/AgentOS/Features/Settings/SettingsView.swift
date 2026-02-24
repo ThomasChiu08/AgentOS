@@ -2,8 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
-    @State private var apiKeyInput: String = ""
-    @State private var apiKeySaved = false
     @AppStorage("yoloModeDefault") private var yoloModeDefault: Bool = false
 
     @Query var projects: [Project]
@@ -14,30 +12,10 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Anthropic API Key") {
-                SecureField("sk-ant-…", text: $apiKeyInput)
-                    .onAppear { loadKeyStatus() }
-
-                HStack {
-                    Button("Save Key") {
-                        KeychainHelper.apiKey = apiKeyInput
-                        apiKeySaved = true
-                    }
-                    .disabled(apiKeyInput.isEmpty)
-
-                    if apiKeySaved {
-                        Label("Saved securely in Keychain", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                    }
+            Section("AI Provider API Keys") {
+                ForEach(AIProvider.allCases) { provider in
+                    ProviderKeyRow(provider: provider)
                 }
-
-                Button("Clear Key", role: .destructive) {
-                    KeychainHelper.apiKey = nil
-                    apiKeyInput = ""
-                    apiKeySaved = false
-                }
-                .controlSize(.small)
             }
 
             Section("Defaults") {
@@ -55,11 +33,62 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
     }
+}
+
+// MARK: - ProviderKeyRow
+
+private struct ProviderKeyRow: View {
+    let provider: AIProvider
+
+    @State private var keyInput: String = ""
+    @State private var isSaved = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(provider.displayName)
+                    .fontWeight(.medium)
+                Spacer()
+                if !provider.requiresAPIKey {
+                    Label("Local — no key needed", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                } else if isSaved {
+                    Label("Saved", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                }
+            }
+
+            if provider.requiresAPIKey {
+                SecureField("API key…", text: $keyInput)
+                    .onAppear { loadKeyStatus() }
+
+                HStack(spacing: 8) {
+                    Button("Save") {
+                        KeychainHelper[provider] = keyInput
+                        isSaved = true
+                    }
+                    .disabled(keyInput.isEmpty)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    Button("Clear", role: .destructive) {
+                        KeychainHelper[provider] = nil
+                        keyInput = ""
+                        isSaved = false
+                    }
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
 
     private func loadKeyStatus() {
-        if KeychainHelper.apiKey != nil {
-            apiKeyInput = "••••••••"
-            apiKeySaved = true
+        if KeychainHelper[provider] != nil {
+            keyInput = "••••••••"
+            isSaved = true
         }
     }
 }
