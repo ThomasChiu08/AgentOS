@@ -331,4 +331,4 @@ mvp/AgentOS/
 
 ---
 
-*Next: see `docs/agent-roles.md` for per-agent system prompts and specifications.*
+*Next: see `docs/agents/` for per-agent system prompts and specifications (index: `docs/agents/README.md`).*

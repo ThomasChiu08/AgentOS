@@ -40,7 +40,7 @@ open mvp/AgentOS/AgentOS.xcodeproj
 | [CLAUDE.md](./CLAUDE.md) | Project memory — architecture decisions, conventions |
 | [docs/plans/2026-02-24-agentos-product-design.md](./docs/plans/2026-02-24-agentos-product-design.md) | Full product design spec |
 | [docs/architecture.md](./docs/architecture.md) | Technical architecture, data models |
-| [docs/agent-roles.md](./docs/agent-roles.md) | All 7 agent specs with system prompts |
+| [docs/agents/](./docs/agents/) | Per-agent specs, system prompts, and roadmaps (index: [README](./docs/agents/README.md)) |
 
 ## Core Concepts
 

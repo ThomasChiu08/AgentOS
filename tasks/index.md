@@ -62,7 +62,7 @@
 |------|---------|
 | `docs/plans/2026-02-24-agentos-product-design.md` | Full product spec, user flows, UX wireframes |
 | `docs/architecture.md` | Tech stack, data models, orchestrator design |
-| `docs/agent-roles.md` | System prompts and specs for all 7 agent roles |
+| `docs/agents/` | Per-agent specs, system prompts, and roadmaps (index: `docs/agents/README.md`) |
 | `docs/plans/mvp-phase2-backend-design.md` | Phase 2 backend services spec (this phase) |
 | `docs/plans/mvp-phase2-frontend-design.md` | Phase 2 frontend SwiftData integration spec (this phase) |
 | `mvp/README.md` | MVP scope, milestones, done criteria |

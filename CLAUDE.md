@@ -141,7 +141,7 @@ enum KeychainService {
 |----------|------|---------|
 | Product Design | `docs/plans/2026-02-24-agentos-product-design.md` | Full product spec, user flows, wireframes |
 | Architecture | `docs/architecture.md` | Technical decisions, data models, module structure |
-| Agent Roles | `docs/agent-roles.md` | System prompts and specs for all 7 agents |
+| Agent Directory | `docs/agents/` | Per-agent specs, system prompts, and roadmaps (index: `docs/agents/README.md`) |
 | MVP Plan | `mvp/README.md` | MVP scope, milestones, done criteria |
 
 ---
