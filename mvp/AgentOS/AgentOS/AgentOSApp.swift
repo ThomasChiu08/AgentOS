@@ -23,16 +23,19 @@ struct AgentOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .modelContainer(sharedModelContainer)
-                .task {
-                    if orchestrator == nil {
+            if let orchestrator {
+                ContentView()
+                    .modelContainer(sharedModelContainer)
+                    .environment(orchestrator)
+            } else {
+                ProgressView("Starting AgentOS…")
+                    .frame(width: 300, height: 200)
+                    .task {
                         orchestrator = AgentOrchestrator(
                             modelContext: sharedModelContainer.mainContext
                         )
                     }
-                }
-                .environment(orchestrator)
+            }
         }
     }
 }
