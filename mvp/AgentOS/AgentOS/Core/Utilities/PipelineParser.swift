@@ -40,7 +40,7 @@ enum PipelineParser {
             return ParsedStage(role: role, task: task, researchURLs: urls)
         }
 
-        guard !stages.isEmpty else { return nil }
+        guard !stages.isEmpty, stages.count <= 6 else { return nil }
         return ParsedPipeline(stages: stages)
     }
 
@@ -64,14 +64,13 @@ enum PipelineParser {
 
     /// Maps CEO JSON role strings (lowercase camelCase) to AgentRole enum cases.
     private static func parseRole(_ string: String) -> AgentRole? {
-        switch string {
-        case "researcher":         return .researcher
-        case "producer":           return .producer
-        case "qaReviewer",
-             "qa_reviewer",
-             "qa reviewer",
-             "reviewer":           return .qaReviewer
-        default:                   return nil
+        switch string.lowercased() {
+        case "researcher":                          return .researcher
+        case "producer", "writer",
+             "content_producer":                    return .producer
+        case "qareviewer", "qa_reviewer",
+             "qa reviewer", "reviewer", "qa":       return .qaReviewer
+        default:                                    return nil
         }
     }
 
@@ -85,11 +84,29 @@ enum PipelineParser {
             return String(text[range])
         }
 
-        // Fallback: find outermost { } pair
-        guard let start = text.firstIndex(of: "{"),
-              let end = text.lastIndex(of: "}")
-        else { return nil }
+        // Fallback: brace-depth tracking to find outermost { } pair
+        return extractOutermostBraces(from: text)
+    }
 
-        return start <= end ? String(text[start...end]) : nil
+    /// Finds the outermost `{ ... }` in text using brace-depth tracking.
+    /// More robust than firstIndex/lastIndex, which fails on nested objects.
+    private static func extractOutermostBraces(from text: String) -> String? {
+        var depth = 0
+        var startIndex: String.Index?
+        for i in text.indices {
+            switch text[i] {
+            case "{":
+                if depth == 0 { startIndex = i }
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0, let start = startIndex {
+                    return String(text[start...i])
+                }
+            default:
+                break
+            }
+        }
+        return nil
     }
 }

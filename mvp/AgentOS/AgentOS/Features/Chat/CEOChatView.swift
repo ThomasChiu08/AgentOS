@@ -46,19 +46,23 @@ struct CEOChatView: View {
     private var stateBar: some View {
         switch viewModel.chatState {
         case .proposalReady:
-            HStack(spacing: 12) {
-                Button("Approve Pipeline") {
-                    Task { await viewModel.approvePipeline() }
-                }
-                .buttonStyle(.borderedProminent)
+            VStack(alignment: .leading, spacing: 0) {
+                PipelinePreviewView(pipeline: viewModel.currentPipeline)
+                Divider()
+                HStack(spacing: 12) {
+                    Button("Approve Pipeline") {
+                        Task { await viewModel.approvePipeline() }
+                    }
+                    .buttonStyle(.borderedProminent)
 
-                Button("Start Over") {
-                    viewModel.reset()
+                    Button("Start Over") {
+                        viewModel.reset()
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
 
         case .pipelineRunning:
             HStack(spacing: 8) {
@@ -136,8 +140,7 @@ struct CEOChatView: View {
 
     private var canSend: Bool {
         !viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty
-        && viewModel.chatState != .waitingForCEO
-        && viewModel.chatState != .pipelineRunning
+        && viewModel.chatState == .idle
     }
 }
 
@@ -164,6 +167,43 @@ private struct MessageBubble: View {
             }
 
             if message.role == .ceo { Spacer(minLength: 60) }
+        }
+    }
+}
+
+// MARK: - Pipeline Preview
+
+private struct PipelinePreviewView: View {
+    let pipeline: Pipeline?
+
+    var body: some View {
+        if let pipeline {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Proposed Pipeline")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                ForEach(pipeline.orderedStages) { stage in
+                    HStack(spacing: 8) {
+                        Image(systemName: stage.agentRole.icon)
+                            .frame(width: 18)
+                            .foregroundStyle(.secondary)
+                        Text(stage.agentRole.rawValue)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .frame(width: 80, alignment: .leading)
+                        Text(String(stage.inputContext.prefix(60)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.bottom, 8)
+            }
         }
     }
 }

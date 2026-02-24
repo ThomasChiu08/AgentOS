@@ -53,37 +53,15 @@ enum ChatState: Equatable {
     // Injected from View via .onAppear
     var orchestrator: AgentOrchestrator?
 
-    // CEO system prompt with JSON output instruction
-    private let ceoSystemPrompt = """
-    You are the CEO of a virtual AI team. Your job is to understand the user's goal \
-    and decompose it into a clear, sequential pipeline of tasks for specialist agents.
-
-    Output your plan as a JSON block:
-    ```json
-    {
-      "pipeline": [
-        { "role": "researcher", "task": "...", "researchURLs": [] },
-        { "role": "producer", "task": "..." },
-        { "role": "qaReviewer", "task": "..." }
-      ]
-    }
-    ```
-    Valid roles: researcher, producer, qaReviewer.
-    After the JSON block, include a brief conversational summary of what the pipeline will do.
-    """
-
     func sendMessage(modelContext: ModelContext) async {
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+        // Block new messages while a proposal is awaiting approval
+        guard chatState != .proposalReady else { return }
 
         messages.append(ChatMessage(role: .user, content: trimmed, timestamp: Date()))
         inputText = ""
         chatState = .waitingForCEO
-
-        // Create project
-        let project = Project(title: trimmed, goal: trimmed)
-        modelContext.insert(project)
-        currentProject = project
 
         guard let orchestrator else {
             chatState = .error("Orchestrator not available.")
@@ -96,7 +74,7 @@ enum ChatState: Equatable {
 
         do {
             let response = try await ceoProvider.complete(
-                systemPrompt: ceoSystemPrompt,
+                systemPrompt: ceoConfig.systemPrompt,   // use AgentConfig prompt, not hardcoded
                 userMessage: trimmed,
                 model: ceoConfig.model,
                 temperature: ceoConfig.temperature
@@ -106,6 +84,11 @@ enum ChatState: Equatable {
 
             // Try to parse pipeline from CEO output
             if let parsed = PipelineParser.parse(response.content) {
+                // Create Project only after successful parse — avoids orphan records
+                let project = Project(title: trimmed, goal: trimmed)
+                modelContext.insert(project)
+                currentProject = project
+
                 let pipeline = Pipeline()
                 pipeline.project = project
                 project.pipeline = pipeline
@@ -120,8 +103,7 @@ enum ChatState: Equatable {
                 currentPipeline = pipeline
                 chatState = .proposalReady
             } else {
-                // Conversational response — no pipeline created
-                chatState = .idle
+                chatState = .error("CEO couldn't generate a pipeline — try rephrasing your task or be more specific.")
             }
         } catch {
             chatState = .error(error.localizedDescription)
@@ -152,6 +134,7 @@ enum ChatState: Equatable {
         chatState = .idle
         currentProject = nil
         currentPipeline = nil
+        messages = []
     }
 
     // MARK: - Private
