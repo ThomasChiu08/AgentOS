@@ -21,8 +21,29 @@ AgentOS is a native macOS app that gives solopreneurs and indie creators a **vir
 
 ### AI Provider Strategy
 - Abstracted via `AIProviderProtocol` — swap Claude / GPT / Gemini per agent
-- Default: Claude (claude-opus-4-6 for CEO, claude-sonnet-4-6 for workers, claude-haiku-4-5 for fast tasks)
-- No Python backend — Swift async/await + URLSession is sufficient for a client-only app
+- Direct Anthropic API via URLSession + Streaming (SSE) — no third-party SDK dependency
+- No Python backend — Swift async/await + actors is sufficient for a client-only app
+
+| Agent Role | Model | Rationale |
+|-----------|-------|-----------|
+| CEO | `claude-opus-4-6` | Deepest reasoning for decomposition |
+| Researcher, Producer, QA | `claude-sonnet-4-6` | Best coding + analysis |
+| Fast/utility tasks | `claude-haiku-4-5-20251001` | Low latency, cost-efficient |
+
+```swift
+actor AnthropicService {
+    private let apiKey: String
+    private let baseURL = URL(string: "https://api.anthropic.com/v1")!
+
+    func stream(messages: [Message], model: String) -> AsyncThrowingStream<String, Error> {
+        // SSE streaming via URLSession data task with delegate
+    }
+
+    func complete(messages: [Message], model: String) async throws -> String {
+        // Non-streaming for simple structured calls
+    }
+}
+```
 
 ---
 
@@ -41,9 +62,76 @@ AgentOS is a native macOS app that gives solopreneurs and indie creators a **vir
 - **UI**: SwiftUI (macOS 14+)
 - **Storage**: SwiftData
 - **Networking**: URLSession (no Alamofire dependency)
-- **AI**: Anthropic Swift SDK (or direct API calls)
+- **AI**: Direct Anthropic API via URLSession + Streaming (SSE)
 - **Concurrency**: Swift async/await + actors
 - **Architecture**: MVVM with service layer
+
+---
+
+## macOS Compliance & Security Checklist
+
+### Required Entitlements (App Sandbox)
+
+```xml
+<!-- AgentOS.entitlements -->
+<key>com.apple.security.app-sandbox</key>       <true/>
+<key>com.apple.security.network.client</key>    <true/>
+<key>com.apple.security.keychain-access-groups</key>
+<array><string>$(AppIdentifierPrefix)com.thomas.agentos</string></array>
+```
+
+### Info.plist Privacy Keys
+
+Add only keys for features actually used — don't preemptively add all:
+
+```xml
+<!-- Only if using AppleScript automation in v1+ -->
+<key>NSAppleEventsUsageDescription</key>
+<string>AgentOS needs AppleEvents to automate tasks on your behalf.</string>
+```
+
+### API Key Storage (Keychain)
+
+Never store secrets in `UserDefaults` or source files:
+
+```swift
+// Core/Services/KeychainService.swift
+enum KeychainService {
+    static func save(apiKey: String, for provider: String) throws {
+        let data = Data(apiKey.utf8)
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: "com.thomas.agentos.\(provider)",
+            kSecValueData: data
+        ]
+        SecItemDelete(query as CFDictionary) // overwrite if exists
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else { throw KeychainError.saveFailed(status) }
+    }
+
+    static func load(for provider: String) throws -> String {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: "com.thomas.agentos.\(provider)",
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let key = String(data: data, encoding: .utf8)
+        else { throw KeychainError.notFound }
+        return key
+    }
+}
+```
+
+### Sandbox Considerations (MVP)
+
+- **Allowed**: `network.client` (Anthropic API, WebFetch), keychain access
+- **Not needed for MVP**: file access (add `.bookmarks` entitlement only when exporting)
+- **Distribution**: App Sandbox required for Mac App Store; add it anyway for security hygiene
 
 ---
 
@@ -61,12 +149,19 @@ AgentOS is a native macOS app that gives solopreneurs and indie creators a **vir
 ## Core Data Models (SwiftData)
 
 ```swift
-Project       { id, title, createdAt, status, teamId }
-Pipeline      { id, projectId, stages: [Stage], edges: [(stageId, stageId)] }
-Stage         { id, pipelineId, agentRole, status, inputContext, outputContent, costUSD, approved }
-Artifact      { id, stageId, type, content, filePath, createdAt }
-AgentConfig   { id, role, name, systemPrompt, model, temperature }
-Team          { id, name, agents: [AgentConfig] }
+// Stage execution state — stored as rawValue String in SwiftData
+enum StageStatus: String, Codable {
+    case pending, running, completed, failed, skipped
+}
+
+Project         { id, title, createdAt, status: String, teamId: UUID }
+Pipeline        { id, projectId, stages: [Stage], edges: [(UUID, UUID)]? }  // nil = linear (MVP default)
+Stage           { id, pipelineId, agentRole, status: StageStatus,
+                  inputContext, outputContent: String?, costUSD: Double, approved: Bool }
+Artifact        { id, stageId, type, content, filePath: String?, createdAt }
+AgentConfig     { id, role, name, systemPrompt, model, temperature: Double }
+Team            { id, name, agents: [AgentConfig] }
+UserPreferences { id: UUID, yoloMode: Bool, theme: String, apiKeyHash: String? }  // singleton
 ```
 
 ---
@@ -91,7 +186,8 @@ mvp/AgentOS/
     │   └── Team/          (TeamView + AgentCardView)
     ├── Core/
     │   ├── Models/        (SwiftData @Model classes)
-    │   ├── Services/      (AgentOrchestrator, AIProviderService, WebFetchService, FileExportService)
+    │   ├── Services/      (AgentOrchestrator, AnthropicService, KeychainService,
+    │   │                   WebFetchService, FileExportService)
     │   └── Extensions/
     └── Resources/
 ```
@@ -108,6 +204,29 @@ mvp/AgentOS/
 | 4 | QA Reviewer | claude-sonnet-4-6 | Quality review, improvement suggestions |
 
 V1 adds: Editor/Formatter, Operations/CX, Finance/Compliance
+
+---
+
+## UI/UX Guidelines
+
+### macOS 15 Design Language
+- **Materials**: `.ultraThinMaterial` / `.regularMaterial` for sidebars and panels
+- **Vibrancy**: `NSVisualEffectView` for window chrome; avoid flat opaque backgrounds
+- **Typography**: SF Pro (system font) — use `.title`, `.headline`, `.caption` semantics
+- **Icons**: SF Symbols 6 — prefer `Image(systemName:)` over custom assets
+- **Animations**: `.spring(response: 0.35, dampingFraction: 0.7)` as default motion curve
+- **Color**: Semantic colors only (`.primary`, `.accentColor`) — auto-adapts to light/dark
+
+### CEO Chat Layout
+- `NavigationSplitView`: sidebar for project history, detail for active chat + pipeline
+- Chat input pinned at bottom; messages scroll upward
+- Compact popover variant for quick task entry (global shortcut: ⌘⇧Space)
+
+### Pipeline Board Layout
+- Horizontal scrollable `HStack` of `StageCard` views inside `ScrollView(.horizontal)`
+- Each card: SF Symbol avatar, role name, status badge, live token counter
+- Stage connections: subtle dashed arrows, animated while stage is running
+- Status colors: `.blue` running · `.green` done · `.orange` waiting · `.red` failed
 
 ---
 

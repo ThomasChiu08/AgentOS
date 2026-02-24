@@ -16,6 +16,23 @@ AgentOS is a native macOS application. Users describe a task in natural language
 
 Most solopreneurs are capable of incredible things — but they're bottlenecked by time. Researching, writing, reviewing, formatting, communicating — each task takes hours. AgentOS automates these workflows with a structured multi-agent system that works the way a real team would.
 
+## Quick Start for Developers
+
+```bash
+# 1. Clone
+git clone https://github.com/thomaschiu/AgentOS.git && cd AgentOS
+
+# 2. Open MVP in Xcode
+open mvp/AgentOS/AgentOS.xcodeproj
+
+# 3. First run
+# - Select the AgentOS scheme, choose "My Mac", press ⌘R
+# - Go to Settings > API Keys and enter your Anthropic API key (stored in Keychain)
+# - Start a task in CEO Chat to kick off your first Pipeline
+```
+
+**Requirements**: macOS 14+, Xcode 16+, Swift 5.10+
+
 ## Documentation
 
 | Document | Description |
@@ -32,3 +49,7 @@ Most solopreneurs are capable of incredible things — but they're bottlenecked 
 - **Stage** — one agent's unit of work
 - **Artifact** — the persistent output of a Stage
 - **Human Gate** — pause point for user approval (can be disabled with Yolo mode)
+
+---
+
+*Built 100% with Vibecoding using Claude Code.*
