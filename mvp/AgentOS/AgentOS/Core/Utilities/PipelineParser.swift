@@ -13,9 +13,56 @@ struct ParsedPipeline {
     let stages: [ParsedStage]
 }
 
+// MARK: - Message Segment
+
+enum MessageSegment {
+    case text(String)
+    case pipeline(ParsedPipeline)
+}
+
 // MARK: - PipelineParser
 
 enum PipelineParser {
+
+    // MARK: - Cached Regex (HIGH #2 fix: avoid recompiling on every call)
+
+    private static let fencedBlockRegex = try? NSRegularExpression(
+        pattern: "```(?:json)?\\s*[\\s\\S]*?```"
+    )
+    private static let fencedContentRegex = try? NSRegularExpression(
+        pattern: "```(?:json)?\\s*([\\s\\S]*?)```"
+    )
+
+    /// Splits CEO message content into renderable segments (text + pipeline cards).
+    static func splitIntoSegments(_ text: String) -> [MessageSegment] {
+        guard let range = jsonBlockRange(from: text) else {
+            return [.text(text)]
+        }
+
+        var segments: [MessageSegment] = []
+
+        // Text before the JSON block
+        let before = String(text[text.startIndex..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !before.isEmpty {
+            segments.append(.text(before))
+        }
+
+        // Pipeline card (falls back to raw text if parse fails)
+        if let parsed = parse(text) {
+            segments.append(.pipeline(parsed))
+        } else {
+            segments.append(.text(String(text[range])))
+        }
+
+        // Text after the JSON block — strip numbered summary lines
+        let after = String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleaned = stripNumberedSummary(after)
+        if !cleaned.isEmpty {
+            segments.append(.text(cleaned))
+        }
+
+        return segments
+    }
 
     /// Extracts a pipeline plan from CEO text output.
     /// Returns nil if no valid JSON block found (conversational response).
@@ -74,23 +121,29 @@ enum PipelineParser {
         }
     }
 
-    /// Extracts the JSON block from CEO output (```json ... ``` or bare { ... }).
+    /// Returns the range of the entire fenced code block (including backticks) or outermost braces.
+    private static func jsonBlockRange(from text: String) -> Range<String.Index>? {
+        if let regex = fencedBlockRegex,
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let range = Range(match.range, in: text) {
+            return range
+        }
+        return outermostBracesRange(from: text)
+    }
+
+    /// Extracts the JSON content from CEO output (```json ... ``` or bare { ... }).
     private static func extractJSONBlock(from text: String) -> String? {
-        // Try ```json ... ``` first
-        let fencedPattern = "```(?:json)?\\s*([\\s\\S]*?)```"
-        if let regex = try? NSRegularExpression(pattern: fencedPattern),
+        if let regex = fencedContentRegex,
            let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
            let range = Range(match.range(at: 1), in: text) {
             return String(text[range])
         }
-
-        // Fallback: brace-depth tracking to find outermost { } pair
-        return extractOutermostBraces(from: text)
+        return outermostBracesRange(from: text).map { String(text[$0]) }
     }
 
-    /// Finds the outermost `{ ... }` in text using brace-depth tracking.
-    /// More robust than firstIndex/lastIndex, which fails on nested objects.
-    private static func extractOutermostBraces(from text: String) -> String? {
+    /// Returns the Range of the outermost `{ ... }` pair using brace-depth tracking.
+    /// Note: blind to braces inside string values — fenced-block regex path is preferred.
+    private static func outermostBracesRange(from text: String) -> Range<String.Index>? {
         var depth = 0
         var startIndex: String.Index?
         for i in text.indices {
@@ -101,12 +154,25 @@ enum PipelineParser {
             case "}":
                 depth -= 1
                 if depth == 0, let start = startIndex {
-                    return String(text[start...i])
+                    return start..<text.index(after: i)
                 }
             default:
                 break
             }
         }
         return nil
+    }
+
+    /// Strips leading numbered summary lines (e.g. "1. Researcher → ...").
+    private static func stripNumberedSummary(_ text: String) -> String {
+        let lines = text.components(separatedBy: .newlines)
+        let filtered = lines.filter { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // Match "1. ", "2. ", etc.
+            guard let first = trimmed.first, first.isNumber else { return true }
+            let pattern = "^\\d+\\.\\s+"
+            return trimmed.range(of: pattern, options: .regularExpression) == nil
+        }
+        return filtered.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

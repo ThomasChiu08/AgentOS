@@ -187,12 +187,18 @@ private struct MessageBubble: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(message.content)
-                    .padding(10)
-                    .background(message.role == .user ? Color.blue : Color(nsColor: .controlBackgroundColor))
-                    .foregroundStyle(message.role == .user ? .white : .primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .textSelection(.enabled)
+                Group {
+                    if message.role == .ceo {
+                        CEOMessageContentView(content: message.content)
+                    } else {
+                        Text(message.content)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(10)
+                .background(message.role == .user ? Color.blue : Color(nsColor: .controlBackgroundColor))
+                .foregroundStyle(message.role == .user ? .white : .primary)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
             if message.role == .ceo { Spacer(minLength: 60) }
