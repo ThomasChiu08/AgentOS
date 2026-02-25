@@ -21,7 +21,14 @@ enum AgentRole: String, Codable, CaseIterable {
     var defaultModelIdentifier: String {
         switch self {
         case .ceo: return AIModel.claudeOpus.rawValue
-        case .researcher, .producer, .qaReviewer: return AIModel.claudeSonnet.rawValue
+        case .researcher, .producer, .qaReviewer: return AIModel.llama32.rawValue
+        }
+    }
+
+    var defaultProvider: AIProvider {
+        switch self {
+        case .ceo: return .anthropic
+        case .researcher, .producer, .qaReviewer: return .ollama
         }
     }
 
@@ -325,6 +332,6 @@ enum AIModel: String, Codable, CaseIterable {
         self.systemPrompt = role.systemPromptTemplate
         self.modelIdentifier = role.defaultModelIdentifier
         self.temperature = 0.7
-        self.providerName = AIProvider.anthropic.rawValue
+        self.providerName = role.defaultProvider.rawValue
     }
 }

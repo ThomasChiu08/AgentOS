@@ -72,7 +72,7 @@ struct AgentConfigEditorView: View {
                 Button("Reset to Default") {
                     config.systemPrompt = config.role.systemPromptTemplate
                     config.modelIdentifier = config.role.defaultModelIdentifier
-                    config.provider = .anthropic
+                    config.provider = config.role.defaultProvider
                     config.temperature = 0.7
                     config.name = config.role.rawValue
                 }
