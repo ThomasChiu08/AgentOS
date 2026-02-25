@@ -3,6 +3,7 @@ import SwiftUI
 struct AgentConfigEditorView: View {
     @Bindable var config: AgentConfig
     @Environment(\.dismiss) var dismiss
+    @State private var ollamaModels: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,12 +25,23 @@ struct AgentConfigEditorView: View {
                         ForEach(config.provider.models, id: \.self) { model in
                             Text(model.displayName).tag(model.rawValue)
                         }
+
+                        if config.provider == .ollama, !ollamaModels.isEmpty {
+                            Divider()
+                            Section("Local Models") {
+                                ForEach(ollamaModels, id: \.self) { name in
+                                    Text(name).tag(name)
+                                }
+                            }
+                        }
+
                         Divider()
                         Text("Custom…").tag("custom")
                     }
 
-                    // Custom model text field — shown when not a known preset for current provider
-                    if config.knownModel == nil || config.knownModel?.provider != config.provider {
+                    // Custom model text field — shown when not a known preset or discovered local model
+                    if (config.knownModel == nil || config.knownModel?.provider != config.provider)
+                        && !ollamaModels.contains(config.modelIdentifier) {
                         TextField("e.g. gpt-oss:20b", text: $config.modelIdentifier)
                             .textFieldStyle(.roundedBorder)
                             .font(.caption.monospaced())
@@ -66,6 +78,15 @@ struct AgentConfigEditorView: View {
                 }
             }
             .formStyle(.grouped)
+            .task(id: config.providerName) {
+                guard config.provider == .ollama else {
+                    ollamaModels = []
+                    return
+                }
+                let baseURL = AIProvider.ollama.customBaseURL ?? "http://localhost:11434"
+                let cleanBase = baseURL.replacingOccurrences(of: "/v1", with: "")
+                ollamaModels = await OllamaHealthCheck.availableModelNames(baseURL: cleanBase)
+            }
 
             // Toolbar
             HStack {
@@ -118,10 +139,15 @@ struct AgentConfigEditorView: View {
     private var modelPickerBinding: Binding<String> {
         Binding(
             get: {
-                guard let known = config.knownModel, known.provider == config.provider else {
-                    return "custom"
+                // Known enum preset for current provider
+                if let known = config.knownModel, known.provider == config.provider {
+                    return config.modelIdentifier
                 }
-                return config.modelIdentifier
+                // Discovered local Ollama model
+                if ollamaModels.contains(config.modelIdentifier) {
+                    return config.modelIdentifier
+                }
+                return "custom"
             },
             set: { value in
                 if value == "custom" {

@@ -134,6 +134,7 @@ struct ModelQuickPicker: View {
             config.providerName = targetProvider
             modelContext.insert(config)
         }
+        syncAllAgents(provider: targetProvider, model: identifier)
     }
 
     private func updateModel(to model: AIModel) {
@@ -145,6 +146,16 @@ struct ModelQuickPicker: View {
             config.modelIdentifier = model.rawValue
             config.providerName = model.provider.rawValue
             modelContext.insert(config)
+        }
+        syncAllAgents(provider: model.provider.rawValue, model: model.rawValue)
+    }
+
+    /// Sync all non-CEO agents to match the CEO's provider and model selection.
+    /// MVP simplicity: all agents use the same model unless manually overridden later.
+    private func syncAllAgents(provider: String, model: String) {
+        for config in allConfigs where config.role != .ceo {
+            config.providerName = provider
+            config.modelIdentifier = model
         }
     }
 }
