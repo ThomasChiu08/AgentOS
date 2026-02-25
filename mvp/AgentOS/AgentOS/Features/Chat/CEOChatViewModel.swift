@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftData
+import os
 
 // MARK: - ChatMessage
 
@@ -53,10 +54,7 @@ enum ChatState: Equatable {
     // Injected from View via .onAppear
     var orchestrator: AgentOrchestrator?
 
-    /// True when no API key is saved for the default Anthropic provider.
-    var apiKeyMissing: Bool {
-        !KeychainHelper.hasKey(for: .anthropic)
-    }
+    private let logger = Logger(subsystem: "com.thomas.agentos", category: "CEOChat")
 
     func sendMessage(modelContext: ModelContext) async {
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
@@ -118,10 +116,12 @@ enum ChatState: Equatable {
                 chatState = .error("CEO couldn't generate a pipeline — try rephrasing your task or be more specific.")
             }
         } catch {
-            chatState = .error(error.localizedDescription)
+            let userMessage = Self.friendlyErrorMessage(for: error)
+            logger.error("CEO request failed: \(error)")
+            chatState = .error(userMessage)
             messages.append(ChatMessage(
                 role: .ceo,
-                content: "Error: \(error.localizedDescription)",
+                content: "Error: \(userMessage)",
                 timestamp: Date()
             ))
         }
@@ -193,8 +193,38 @@ enum ChatState: Equatable {
 
     // MARK: - Private
 
+    // MARK: - Helpers
+
     private func resolvedCEOConfig(modelContext: ModelContext) -> AgentConfig {
         let all = (try? modelContext.fetch(FetchDescriptor<AgentConfig>())) ?? []
         return all.first(where: { $0.role == .ceo }) ?? AgentConfig(role: .ceo)
+    }
+
+    /// Translates raw network/provider errors into actionable user-facing messages.
+    static func friendlyErrorMessage(for error: Error) -> String {
+        if let providerError = error as? AIProviderError {
+            return providerError.localizedDescription ?? error.localizedDescription
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .cannotConnectToHost, .cannotFindHost:
+                let host = urlError.failingURL?.host() ?? "server"
+                if host == "localhost" || host == "127.0.0.1" {
+                    return "Cannot connect to local server. Make sure Ollama is running: `ollama serve`"
+                }
+                return "Cannot connect to \(host). Check your network connection."
+            case .timedOut:
+                return "Request timed out. The model may still be loading — try again in a moment."
+            case .notConnectedToInternet:
+                return "No internet connection. Check your network settings."
+            case .secureConnectionFailed:
+                return "Secure connection failed. Check your API endpoint URL."
+            default:
+                return "Network error: \(urlError.localizedDescription)"
+            }
+        }
+
+        return error.localizedDescription
     }
 }

@@ -126,21 +126,7 @@ struct CEOChatView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
 
-        case .idle:
-            if viewModel.apiKeyMissing {
-                HStack(spacing: 8) {
-                    Image(systemName: "key.slash")
-                        .foregroundStyle(.orange)
-                    Text("API key not set — messages won't send.")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            }
-
-        default:
+        case .idle, .waitingForCEO:
             EmptyView()
         }
     }

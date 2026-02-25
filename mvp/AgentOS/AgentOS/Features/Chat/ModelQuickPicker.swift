@@ -7,6 +7,9 @@ struct ModelQuickPicker: View {
     @Environment(\.modelContext) private var modelContext
     // Fetch all, filter in-memory — avoids #Predicate rawValue issues with enum properties.
     @Query private var allConfigs: [AgentConfig]
+    @State private var showingCustomModelInput = false
+    @State private var customModelInput = ""
+    @State private var ollamaModels: [String] = []
 
     private var ceoConfig: AgentConfig? {
         allConfigs.first(where: { $0.role == .ceo })
@@ -45,6 +48,30 @@ struct ModelQuickPicker: View {
                 }
             }
 
+            // Show locally discovered Ollama models when using Ollama provider
+            if currentProvider == .ollama, !ollamaModels.isEmpty {
+                Divider()
+                Section("Local Models") {
+                    ForEach(ollamaModels, id: \.self) { name in
+                        Button {
+                            updateCustomModel(name)
+                        } label: {
+                            if name == modelIdentifier {
+                                Label(name, systemImage: "checkmark")
+                            } else {
+                                Text(name)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Button {
+                showingCustomModelInput = true
+            } label: {
+                Label("Custom model…", systemImage: "pencil")
+            }
+
             Divider()
 
             // Other providers as submenus
@@ -70,6 +97,43 @@ struct ModelQuickPicker: View {
             }
         }
         .menuStyle(.borderlessButton)
+        .task(id: currentProvider) {
+            guard currentProvider == .ollama else {
+                ollamaModels = []
+                return
+            }
+            let baseURL = AIProvider.ollama.customBaseURL ?? "http://localhost:11434"
+            // Strip /v1 suffix — OllamaHealthCheck uses the native /api/tags endpoint
+            let cleanBase = baseURL.replacingOccurrences(of: "/v1", with: "")
+            ollamaModels = await OllamaHealthCheck.availableModelNames(baseURL: cleanBase)
+        }
+        .alert("Custom Model", isPresented: $showingCustomModelInput) {
+            TextField("e.g. gpt-oss:20b", text: $customModelInput)
+            Button("Use") {
+                let trimmed = customModelInput.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { updateCustomModel(trimmed) }
+                customModelInput = ""
+            }
+            Button("Cancel", role: .cancel) {
+                customModelInput = ""
+            }
+        } message: {
+            Text("Enter the exact model identifier from your provider.")
+        }
+    }
+
+    private func updateCustomModel(_ identifier: String) {
+        // Custom identifiers are local Ollama models — always route to Ollama endpoint.
+        let targetProvider = AIProvider.ollama.rawValue
+        if let config = ceoConfig {
+            config.modelIdentifier = identifier
+            config.providerName = targetProvider
+        } else {
+            let config = AgentConfig(role: .ceo)
+            config.modelIdentifier = identifier
+            config.providerName = targetProvider
+            modelContext.insert(config)
+        }
     }
 
     private func updateModel(to model: AIModel) {

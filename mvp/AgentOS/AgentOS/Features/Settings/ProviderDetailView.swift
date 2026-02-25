@@ -33,6 +33,13 @@ private struct BuiltInDetailView: View {
     @State private var baseURLInput = ""
     @State private var isSaved = false
     @State private var showKey = false
+    @State private var connectionTestResult: ConnectionTestResult?
+
+    enum ConnectionTestResult {
+        case testing
+        case success([String])
+        case failure(String)
+    }
 
     var body: some View {
         ScrollView {
@@ -43,6 +50,9 @@ private struct BuiltInDetailView: View {
                     apiKeySection
                 }
                 baseURLSection
+                if !provider.requiresAPIKey {
+                    connectionTestSection
+                }
                 actionButtons
             }
             .padding(24)
@@ -106,6 +116,74 @@ private struct BuiltInDetailView: View {
             Text("Leave blank to use the default endpoint.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var connectionTestSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Connection")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                Button("Test Connection") {
+                    testConnection()
+                }
+                .disabled(connectionTestResult.map { if case .testing = $0 { return true } else { return false } } ?? false)
+
+                switch connectionTestResult {
+                case .testing:
+                    ProgressView().scaleEffect(0.7)
+                    Text("Connecting…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .success(let models):
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("\(models.count) model\(models.count == 1 ? "" : "s") available")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                case .failure(let msg):
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                case nil:
+                    EmptyView()
+                }
+            }
+
+            if case .success(let models) = connectionTestResult, !models.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(models.prefix(10), id: \.self) { name in
+                        Text(name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if models.count > 10 {
+                        Text("… and \(models.count - 10) more")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(.leading, 4)
+            }
+        }
+    }
+
+    private func testConnection() {
+        connectionTestResult = .testing
+        Task {
+            let base = baseURLInput.isEmpty ? provider.defaultBaseURL : baseURLInput
+            // Strip /v1 suffix — OllamaHealthCheck uses the native /api/tags endpoint
+            let cleanBase = base.replacingOccurrences(of: "/v1", with: "")
+            let result = await OllamaHealthCheck.check(baseURL: cleanBase)
+            switch result {
+            case .success(let models):
+                connectionTestResult = .success(models.map(\.name))
+            case .failure(let error):
+                connectionTestResult = .failure(error.localizedDescription)
+            }
         }
     }
 

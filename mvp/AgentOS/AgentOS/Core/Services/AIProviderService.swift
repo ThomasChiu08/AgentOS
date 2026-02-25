@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - String Helpers
 
@@ -182,14 +183,17 @@ enum AIProviderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey(let provider):
-            return "API key not set for \(provider.displayName). Open Settings to add your key."
+            return "API key not set for \(provider.displayName). Go to Settings → API Keys to add it."
         case .invalidResponse:
             return "Unexpected response from AI provider."
         case .rateLimited:
-            return "Rate limit reached. Please wait and try again."
+            return "Rate limit reached. Please wait a moment and try again."
         case .timeout:
-            return "Request timed out. The AI provider may be slow — try again."
+            return "Request timed out. The model may still be loading — try again in a moment."
         case .serverError(let code):
+            if code == 401 {
+                return "API key invalid or expired. Check your key in Settings."
+            }
             return "Server error (\(code)). Please try again."
         case .networkError(let err):
             return "Network error: \(err.localizedDescription)"
@@ -201,6 +205,7 @@ enum AIProviderError: LocalizedError {
 
 struct ClaudeProvider: AIProviderProtocol {
     private let anthropicVersion = "2023-06-01"
+    private let logger = Logger(subsystem: "com.thomas.agentos", category: "ClaudeProvider")
 
     func complete(
         systemPrompt: String,
@@ -232,12 +237,16 @@ struct ClaudeProvider: AIProviderProtocol {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+        logger.debug("Sending request to \(endpoint.absoluteString) model=\(modelIdentifier)")
+
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch let error as URLError where error.code == .timedOut {
+            logger.error("Request timed out: \(endpoint.absoluteString)")
             throw AIProviderError.timeout
         } catch {
+            logger.error("Network error: \(error.localizedDescription) url=\(endpoint.absoluteString)")
             throw AIProviderError.networkError(error)
         }
 
@@ -245,14 +254,19 @@ struct ClaudeProvider: AIProviderProtocol {
             throw AIProviderError.invalidResponse
         }
 
+        logger.debug("Response status=\(http.statusCode) from \(endpoint.absoluteString)")
+
         switch http.statusCode {
         case 200:
             return try parseAnthropicResponse(data: data, modelIdentifier: modelIdentifier)
         case 401:
+            logger.warning("Authentication failed for Anthropic")
             throw AIProviderError.missingAPIKey(.anthropic)
         case 429:
+            logger.warning("Rate limited by Anthropic")
             throw AIProviderError.rateLimited
         default:
+            logger.error("Server error \(http.statusCode) from Anthropic")
             throw AIProviderError.serverError(http.statusCode)
         }
     }
@@ -287,6 +301,7 @@ struct ClaudeProvider: AIProviderProtocol {
 /// Handles all 9 non-Anthropic providers via the OpenAI-compatible /v1/chat/completions endpoint.
 struct OpenAICompatibleProvider: AIProviderProtocol {
     let provider: AIProvider
+    private let logger = Logger(subsystem: "com.thomas.agentos", category: "OpenAIProvider")
 
     func complete(
         systemPrompt: String,
@@ -319,12 +334,17 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+        let endpoint = provider.chatCompletionURL
+        logger.debug("Sending request to \(endpoint.absoluteString) provider=\(self.provider.displayName) model=\(modelIdentifier)")
+
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch let error as URLError where error.code == .timedOut {
+            logger.error("Request timed out: \(endpoint.absoluteString)")
             throw AIProviderError.timeout
         } catch {
+            logger.error("Network error: \(error.localizedDescription) url=\(endpoint.absoluteString)")
             throw AIProviderError.networkError(error)
         }
 
@@ -332,14 +352,19 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
             throw AIProviderError.invalidResponse
         }
 
+        logger.debug("Response status=\(http.statusCode) from \(self.provider.displayName)")
+
         switch http.statusCode {
         case 200:
             return try parseOpenAIResponse(data: data, modelIdentifier: modelIdentifier)
         case 401:
+            logger.warning("Authentication failed for \(self.provider.displayName)")
             throw AIProviderError.missingAPIKey(provider)
         case 429:
+            logger.warning("Rate limited by \(self.provider.displayName)")
             throw AIProviderError.rateLimited
         default:
+            logger.error("Server error \(http.statusCode) from \(self.provider.displayName)")
             throw AIProviderError.serverError(http.statusCode)
         }
     }

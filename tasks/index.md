@@ -1,7 +1,7 @@
 # AgentOS — Project Index
 
-**Last Updated:** 2026-02-24
-**Current Phase:** MVP Phase 2 (Backend & SwiftData Integration)
+**Last Updated:** 2026-02-25
+**Current Phase:** MVP Phase 2 — Complete ✅ | Next: Phase 3 Polish
 
 > Quick-start guide for new sessions. Read this first, then follow links.
 
@@ -21,36 +21,49 @@
 | Mock data for UI preview | ✅ |
 | Build succeeds (macOS 14+) | ✅ |
 
-### Phase 2 🔄 In Progress — Backend Services + SwiftData Integration
+### Phase 2 ✅ Complete — Backend Services + SwiftData Integration
 
 #### Backend Services
 
-- [ ] `KeychainHelper.swift` — API key read/write
-- [ ] `AIProviderService.swift` — Protocol + ClaudeProvider (HTTP to Anthropic API)
-- [ ] `WebFetchService.swift` — URLSession wrapper, HTML → plain text
-- [ ] `FileExportService.swift` — Export to `~/Documents/AgentOS/`
-- [ ] `PipelineParser.swift` — CEO JSON output → Pipeline + Stage[]
-- [ ] `AgentOrchestrator.swift` — Pipeline state machine actor
+- [x] `KeychainHelper.swift` — API key read/write
+- [x] `AIProviderService.swift` — Protocol + ClaudeProvider + OpenAICompatibleProvider; 30s timeout; `.timeout` error case
+- [x] `WebFetchService.swift` — URLSession wrapper, HTML → plain text
+- [x] `FileExportService.swift` — Export to `~/Documents/AgentOS/`
+- [x] `PipelineParser.swift` — CEO JSON output → Pipeline + Stage[]
+- [x] `AgentOrchestrator.swift` — Pipeline state machine actor; persists `.failed` status on error
+- [x] `QAOutputParser.swift` — Regex-extracts score and recommendation from QA output
 
 #### Frontend Integration
 
-- [ ] `CEOChatViewModel` → real API + SwiftData
-- [ ] `PipelineBoardView` → `@Query` real Stages
-- [ ] `ArtifactsView` → `@Query` real Artifacts
-- [ ] `TeamView` → `@Query` real AgentConfigs + first-launch seed
-- [ ] `SettingsView.swift` (new) — API key input + Yolo default
+- [x] `CEOChatViewModel` → real API + SwiftData; pre-flight API key check; `loadProject()` for history
+- [x] `PipelineBoardView` → `@Query` real Stages; error banner on pipeline failure
+- [x] `ArtifactsView` → `@Query` real Artifacts (sorted by `createdAt` desc)
+- [x] `TeamView` → `@Query` real AgentConfigs
+- [x] `SettingsView.swift` — API key input + Yolo default toggle
+- [x] `ModelQuickPicker` — compact CEO model switcher; checkmark + Switch Provider submenu
+- [x] `ModelTierBadge` — Speed/Balanced/Power + Custom badge for arbitrary model names
+- [x] `ProjectListView` — project history sidebar in `HSplitView` alongside CEO Chat
+- [x] `AgentConfigEditorView` — custom model name TextField + ModelTierBadge
+
+#### Beyond Original Scope (shipped in Phase 2)
+
+- [x] Multi-provider support — Anthropic, OpenAI-compatible, Ollama, Gemini, DeepSeek, Groq, etc.
+- [x] Custom model name input — arbitrary `modelIdentifier: String` (not locked to enum)
+- [x] Structured agent output formats — Researcher/Producer/QA output schemas
+- [x] QA score badge on StageCardView — colored X/10 display
 
 #### End-to-End
 
-- [ ] 5 real-task end-to-end tests
+- [ ] 5 real-task end-to-end tests (smoke test with real API key)
 
-### Phase 3 ⏳ Planned — Polish & Distribution
+### Phase 3 🔄 In Progress — Polish & Distribution
 
-- Multi-model support (OpenAI, Gemini)
-- Cost tracking dashboard
-- Project history browser
-- Pipeline templates
-- App Store submission
+- [ ] Error handling hardening (retry, partial failure recovery)
+- [ ] Empty states for all views
+- [ ] Cost tracking dashboard
+- [ ] Pipeline templates
+- [ ] Yolo mode — full end-to-end auto-run verification
+- [ ] App Store submission prep
 
 ---
 
