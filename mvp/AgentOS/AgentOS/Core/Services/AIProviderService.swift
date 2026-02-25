@@ -1,9 +1,51 @@
 import Foundation
 
+// MARK: - String Helpers
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
+}
+
 // MARK: - AIProvider URL Extension
 
 extension AIProvider {
+    /// UserDefaults key for a custom base URL override for this provider.
+    private var baseURLDefaultsKey: String { "agentos.\(rawValue).baseURL" }
+
+    /// The custom base URL set by the user in Settings, or nil if using the default.
+    var customBaseURL: String? {
+        get { UserDefaults.standard.string(forKey: baseURLDefaultsKey)?.nonEmpty }
+        nonmutating set {
+            if let value = newValue, !value.isEmpty {
+                UserDefaults.standard.set(value, forKey: baseURLDefaultsKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: baseURLDefaultsKey)
+            }
+        }
+    }
+
+    /// The default base URL (without path) shown as placeholder in Settings.
+    var defaultBaseURL: String {
+        switch self {
+        case .anthropic: return "https://api.anthropic.com/v1"
+        case .openai:    return "https://api.openai.com/v1"
+        case .ollama:    return "http://localhost:11434/v1"
+        case .qwen:      return "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        case .minimax:   return "https://api.minimax.chat/v1"
+        case .gemini:    return "https://generativelanguage.googleapis.com/v1beta/openai"
+        case .deepseek:  return "https://api.deepseek.com/v1"
+        case .groq:      return "https://api.groq.com/openai/v1"
+        case .mistral:   return "https://api.mistral.ai/v1"
+        case .cohere:    return "https://api.cohere.com/compatibility/v1"
+        }
+    }
+
     var chatCompletionURL: URL {
+        // Prefer the user's custom base URL when set.
+        if let base = customBaseURL,
+           let url = URL(string: base.trimmingCharacters(in: .init(charactersIn: "/")) + "/chat/completions") {
+            return url
+        }
         switch self {
         case .anthropic:
             return URL(string: "https://api.anthropic.com/v1/messages")!
@@ -158,7 +200,6 @@ enum AIProviderError: LocalizedError {
 // MARK: - ClaudeProvider (Anthropic native format)
 
 struct ClaudeProvider: AIProviderProtocol {
-    private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     private let anthropicVersion = "2023-06-01"
 
     func complete(
@@ -170,6 +211,11 @@ struct ClaudeProvider: AIProviderProtocol {
         guard let apiKey = KeychainHelper[.anthropic], !apiKey.isEmpty else {
             throw AIProviderError.missingAPIKey(.anthropic)
         }
+
+        // Respect custom base URL override if set, otherwise use the default.
+        let endpoint = AIProvider.anthropic.customBaseURL
+            .flatMap { URL(string: $0.trimmingCharacters(in: .init(charactersIn: "/")) + "/messages") }
+            ?? URL(string: "https://api.anthropic.com/v1/messages")!
 
         var request = URLRequest(url: endpoint, timeoutInterval: 30)
         request.httpMethod = "POST"

@@ -41,6 +41,7 @@ private struct ProviderKeyRow: View {
     let provider: AIProvider
 
     @State private var keyInput: String = ""
+    @State private var baseURLInput: String = ""
     @State private var isSaved = false
 
     var body: some View {
@@ -62,33 +63,51 @@ private struct ProviderKeyRow: View {
 
             if provider.requiresAPIKey {
                 SecureField("API key…", text: $keyInput)
-                    .onAppear { loadKeyStatus() }
+            }
 
-                HStack(spacing: 8) {
-                    Button("Save") {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Base URL")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField(provider.defaultBaseURL, text: $baseURLInput)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+                    .autocorrectionDisabled()
+            }
+
+            HStack(spacing: 8) {
+                Button("Save") {
+                    if provider.requiresAPIKey {
                         KeychainHelper[provider] = keyInput
                         isSaved = true
                     }
-                    .disabled(keyInput.isEmpty)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    provider.customBaseURL = baseURLInput.isEmpty ? nil : baseURLInput
+                }
+                .disabled(provider.requiresAPIKey ? keyInput.isEmpty : baseURLInput.isEmpty)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
 
-                    Button("Clear", role: .destructive) {
+                Button("Clear", role: .destructive) {
+                    if provider.requiresAPIKey {
                         KeychainHelper[provider] = nil
                         keyInput = ""
                         isSaved = false
                     }
-                    .controlSize(.small)
+                    provider.customBaseURL = nil
+                    baseURLInput = ""
                 }
+                .controlSize(.small)
             }
         }
         .padding(.vertical, 2)
+        .onAppear { loadStatus() }
     }
 
-    private func loadKeyStatus() {
-        if KeychainHelper[provider] != nil {
+    private func loadStatus() {
+        if provider.requiresAPIKey, KeychainHelper[provider] != nil {
             keyInput = "••••••••"
             isSaved = true
         }
+        baseURLInput = provider.customBaseURL ?? ""
     }
 }
