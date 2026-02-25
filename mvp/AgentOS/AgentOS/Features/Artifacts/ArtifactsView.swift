@@ -55,7 +55,13 @@ struct ArtifactsView: View {
 
     private var historyToggle: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            Toggle("Show All", isOn: $showAllHistory)
+            Toggle("Show All", isOn: Binding(
+                get: { showAllHistory },
+                set: {
+                    showAllHistory = $0
+                    selectedArtifact = nil
+                }
+            ))
                 .toggleStyle(.switch)
                 .help("Show artifacts from all pipelines")
         }
