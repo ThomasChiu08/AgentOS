@@ -41,9 +41,9 @@ enum KeychainHelper {
         !provider.requiresAPIKey || self[provider] != nil
     }
 
-    // MARK: - Private
+    // MARK: - Account-level Access (for custom providers)
 
-    private static func save(_ value: String, account: String) {
+    static func save(_ value: String, account: String) {
         let data = Data(value.utf8)
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -70,7 +70,7 @@ enum KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func delete(account: String) {
+    static func delete(account: String) {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,

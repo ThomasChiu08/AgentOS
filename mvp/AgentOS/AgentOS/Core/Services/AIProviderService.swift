@@ -377,6 +377,176 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
     }
 }
 
+// MARK: - CustomProviderAdapter
+
+/// Adapts a `CustomProvider` (SwiftData model) to `AIProviderProtocol`.
+/// Captures only the primitive values needed for the request — avoids holding the non-Sendable @Model.
+struct CustomProviderAdapter: AIProviderProtocol {
+    let baseURL: String
+    let requiresAPIKey: Bool
+    let keychainAccount: String
+    let apiFormat: CustomProvider.APIFormat
+
+    init(customProvider: CustomProvider) {
+        self.baseURL = customProvider.baseURL
+        self.requiresAPIKey = customProvider.requiresAPIKey
+        self.keychainAccount = customProvider.keychainAccount
+        self.apiFormat = customProvider.apiFormat
+    }
+
+    func complete(
+        systemPrompt: String,
+        userMessage: String,
+        modelIdentifier: String,
+        temperature: Double
+    ) async throws -> AIResponse {
+        switch apiFormat {
+        case .anthropicMessages:
+            return try await completeAnthropic(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage,
+                modelIdentifier: modelIdentifier,
+                temperature: temperature
+            )
+        case .chatCompletions:
+            return try await completeChatCompletions(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage,
+                modelIdentifier: modelIdentifier,
+                temperature: temperature
+            )
+        }
+    }
+
+    private func completeChatCompletions(
+        systemPrompt: String,
+        userMessage: String,
+        modelIdentifier: String,
+        temperature: Double
+    ) async throws -> AIResponse {
+        let base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + "/chat/completions") else {
+            throw AIProviderError.invalidResponse
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if requiresAPIKey,
+           let key = KeychainHelper.read(account: keychainAccount) {
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        }
+
+        let body: [String: Any] = [
+            "model": modelIdentifier,
+            "temperature": temperature,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user",   "content": userMessage]
+            ]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await performRequest(request)
+        let http = try validateHTTPResponse(response)
+        try checkStatusCode(http.statusCode)
+
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let choices = json["choices"] as? [[String: Any]],
+            let message = choices.first?["message"] as? [String: Any],
+            let text = message["content"] as? String
+        else {
+            throw AIProviderError.invalidResponse
+        }
+
+        var inputTokens = 0
+        var outputTokens = 0
+        if let usage = json["usage"] as? [String: Any] {
+            inputTokens  = usage["prompt_tokens"]     as? Int ?? 0
+            outputTokens = usage["completion_tokens"] as? Int ?? 0
+        }
+
+        return AIResponse(content: text, inputTokens: inputTokens, outputTokens: outputTokens, costUSD: 0)
+    }
+
+    private func completeAnthropic(
+        systemPrompt: String,
+        userMessage: String,
+        modelIdentifier: String,
+        temperature: Double
+    ) async throws -> AIResponse {
+        let base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + "/messages") else {
+            throw AIProviderError.invalidResponse
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+
+        if requiresAPIKey,
+           let key = KeychainHelper.read(account: keychainAccount) {
+            request.setValue(key, forHTTPHeaderField: "x-api-key")
+        }
+
+        let body: [String: Any] = [
+            "model": modelIdentifier,
+            "max_tokens": 4096,
+            "temperature": temperature,
+            "system": systemPrompt,
+            "messages": [["role": "user", "content": userMessage]]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await performRequest(request)
+        let http = try validateHTTPResponse(response)
+        try checkStatusCode(http.statusCode)
+
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let contentArr = json["content"] as? [[String: Any]],
+            let text = contentArr.first?["text"] as? String,
+            let usage = json["usage"] as? [String: Any],
+            let inputTokens = usage["input_tokens"] as? Int,
+            let outputTokens = usage["output_tokens"] as? Int
+        else {
+            throw AIProviderError.invalidResponse
+        }
+
+        return AIResponse(content: text, inputTokens: inputTokens, outputTokens: outputTokens, costUSD: 0)
+    }
+
+    // MARK: - Network Helpers
+
+    private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await URLSession.shared.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            throw AIProviderError.timeout
+        } catch {
+            throw AIProviderError.networkError(error)
+        }
+    }
+
+    private func validateHTTPResponse(_ response: URLResponse) throws -> HTTPURLResponse {
+        guard let http = response as? HTTPURLResponse else {
+            throw AIProviderError.invalidResponse
+        }
+        return http
+    }
+
+    private func checkStatusCode(_ code: Int) throws {
+        switch code {
+        case 200: return
+        case 429: throw AIProviderError.rateLimited
+        default:  throw AIProviderError.serverError(code)
+        }
+    }
+}
+
 // MARK: - AIProviderFactory
 
 enum AIProviderFactory {
@@ -384,5 +554,9 @@ enum AIProviderFactory {
         provider == .anthropic
             ? ClaudeProvider()
             : OpenAICompatibleProvider(provider: provider)
+    }
+
+    static func make(for customProvider: CustomProvider) -> any AIProviderProtocol {
+        CustomProviderAdapter(customProvider: customProvider)
     }
 }

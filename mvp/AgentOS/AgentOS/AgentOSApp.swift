@@ -10,13 +10,14 @@ struct AgentOSApp: App {
             Stage.self,
             Artifact.self,
             AgentConfig.self,
+            CustomProvider.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
+#if DEBUG
             // Schema changed — delete the incompatible store and recreate (dev-time only).
-            // In production you'd provide a MigrationPlan instead.
             let storeURL = config.url
             try? FileManager.default.removeItem(at: storeURL)
             try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
@@ -26,6 +27,9 @@ struct AgentOSApp: App {
             } catch {
                 fatalError("Could not create ModelContainer: \(error)")
             }
+#else
+            fatalError("ModelContainer failed — a MigrationPlan is required: \(error)")
+#endif
         }
     }()
 
