@@ -2,17 +2,34 @@ import SwiftUI
 import SwiftData
 
 struct ArtifactsView: View {
-    @Query(sort: \Artifact.createdAt, order: .reverse) var artifacts: [Artifact]
+    @Query(sort: \Pipeline.createdAt, order: .reverse) var pipelines: [Pipeline]
+    @Query(sort: \Artifact.createdAt, order: .reverse) var allArtifacts: [Artifact]
+    @State private var showAllHistory = false
     @State private var selectedArtifact: Artifact?
+
+    private var artifacts: [Artifact] {
+        if showAllHistory {
+            return allArtifacts
+        }
+        guard let pipeline = pipelines.first else { return [] }
+        return pipeline.orderedStages
+            .flatMap { $0.artifacts }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
 
     var body: some View {
         if artifacts.isEmpty {
             ContentUnavailableView(
-                "No Artifacts Yet",
+                showAllHistory ? "No Artifacts Yet" : "No Artifacts in Current Pipeline",
                 systemImage: "doc.richtext",
-                description: Text("Artifacts will appear here after pipeline stages complete.")
+                description: Text(
+                    showAllHistory
+                        ? "Artifacts will appear here after pipeline stages complete."
+                        : "This pipeline has no artifacts yet. Toggle \"Show All\" to view history."
+                )
             )
             .navigationTitle("Artifacts")
+            .toolbar { historyToggle }
         } else {
             NavigationSplitView {
                 List(artifacts, selection: $selectedArtifact) { artifact in
@@ -21,6 +38,7 @@ struct ArtifactsView: View {
                 }
                 .navigationTitle("Artifacts")
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+                .toolbar { historyToggle }
             } detail: {
                 if let artifact = selectedArtifact {
                     ArtifactDetailView(artifact: artifact)
@@ -32,6 +50,14 @@ struct ArtifactsView: View {
                     )
                 }
             }
+        }
+    }
+
+    private var historyToggle: some ToolbarContent {
+        ToolbarItem(placement: .automatic) {
+            Toggle("Show All", isOn: $showAllHistory)
+                .toggleStyle(.switch)
+                .help("Show artifacts from all pipelines")
         }
     }
 }
