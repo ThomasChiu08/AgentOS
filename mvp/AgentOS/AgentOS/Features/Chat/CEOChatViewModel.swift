@@ -56,7 +56,7 @@ enum ChatState: Equatable {
 
     private let logger = Logger(subsystem: "com.thomas.agentos", category: "CEOChat")
 
-    func sendMessage(modelContext: ModelContext) async {
+    func sendMessage(modelContext: ModelContext, yoloModeDefault: Bool = false) async {
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         // Block new messages while a proposal is awaiting approval
@@ -99,7 +99,7 @@ enum ChatState: Equatable {
                 modelContext.insert(project)
                 currentProject = project
 
-                let pipeline = Pipeline()
+                let pipeline = Pipeline(yoloMode: yoloModeDefault)
                 pipeline.project = project
                 project.pipeline = pipeline
                 modelContext.insert(pipeline)
@@ -113,6 +113,7 @@ enum ChatState: Equatable {
                 currentPipeline = pipeline
                 chatState = .proposalReady
             } else {
+                logger.warning("CEO response failed to parse: \(response.content.prefix(500))")
                 chatState = .error("CEO couldn't generate a pipeline — try rephrasing your task or be more specific.")
             }
         } catch {

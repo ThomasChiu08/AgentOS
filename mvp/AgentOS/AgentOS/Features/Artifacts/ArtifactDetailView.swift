@@ -73,7 +73,7 @@ struct ArtifactDetailView: View {
             exportedPath = url.path
             showExportConfirmation = true
         } catch {
-            exportedPath = "Export failed: \(error.localizedDescription)"
+            exportedPath = "Failed to export artifact. \(error.localizedDescription)"
             showExportConfirmation = true
         }
     }

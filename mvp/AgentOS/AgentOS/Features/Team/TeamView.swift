@@ -9,18 +9,28 @@ struct TeamView: View {
     private let columns = [GridItem(.flexible(minimum: 200)), GridItem(.flexible(minimum: 200))]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                sectionHeader
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(configs) { config in
-                        AgentCardView(config: config) {
-                            editingConfig = config
+        Group {
+            if configs.isEmpty {
+                ContentUnavailableView {
+                    Label("Setting Up Team", systemImage: "person.3")
+                } description: {
+                    Text("Your AI team is being configured…")
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionHeader
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(configs) { config in
+                                AgentCardView(config: config) {
+                                    editingConfig = config
+                                }
+                            }
                         }
                     }
+                    .padding()
                 }
             }
-            .padding()
         }
         .navigationTitle("Team")
         .onAppear { seedDefaultsIfNeeded() }

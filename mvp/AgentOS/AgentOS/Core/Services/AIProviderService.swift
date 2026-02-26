@@ -493,6 +493,8 @@ struct CustomProviderAdapter: AIProviderProtocol {
             outputTokens = usage["completion_tokens"] as? Int ?? 0
         }
 
+        // Custom providers default to $0 cost — correct for local models (Ollama, LM Studio).
+        // If the custom provider points to a paid API, the user should use a built-in provider instead.
         return AIResponse(content: text, inputTokens: inputTokens, outputTokens: outputTokens, costUSD: 0)
     }
 
@@ -541,6 +543,7 @@ struct CustomProviderAdapter: AIProviderProtocol {
             throw AIProviderError.invalidResponse
         }
 
+        // Custom providers default to $0 cost — correct for local models (Ollama, LM Studio).
         return AIResponse(content: text, inputTokens: inputTokens, outputTokens: outputTokens, costUSD: 0)
     }
 

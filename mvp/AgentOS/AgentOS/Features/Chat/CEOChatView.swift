@@ -4,6 +4,7 @@ struct CEOChatView: View {
     @Binding var selectedProjectID: UUID?
     @Environment(AgentOrchestrator.self) var orchestrator
     @Environment(\.modelContext) var modelContext
+    @AppStorage("yoloModeDefault") private var yoloModeDefault = false
     @State private var viewModel = CEOChatViewModel()
     @State private var isSyncingProjectID = false
 
@@ -40,6 +41,15 @@ struct CEOChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
+                    if viewModel.messages.isEmpty && viewModel.chatState == .idle {
+                        ContentUnavailableView(
+                            "Welcome to AgentOS",
+                            systemImage: "bubble.left.and.text.bubble.right",
+                            description: Text("Type a task below and your AI team will get to work.")
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, 80)
+                    }
                     ForEach(viewModel.messages) { message in
                         MessageBubble(message: message)
                             .id(message.id)
@@ -142,14 +152,14 @@ struct CEOChatView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
                 .onSubmit {
-                    Task { await viewModel.sendMessage(modelContext: modelContext) }
+                    Task { await viewModel.sendMessage(modelContext: modelContext, yoloModeDefault: yoloModeDefault) }
                 }
 
             HStack(spacing: 8) {
                 ModelQuickPicker()
                 Spacer()
                 Button {
-                    Task { await viewModel.sendMessage(modelContext: modelContext) }
+                    Task { await viewModel.sendMessage(modelContext: modelContext, yoloModeDefault: yoloModeDefault) }
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.title2)
