@@ -96,11 +96,17 @@ struct CEOChatView: View {
             }
 
         case .pipelineRunning:
-            HStack(spacing: 8) {
-                ProgressView().scaleEffect(0.7)
-                Text("Pipeline is running — switch to Pipeline Board to see progress.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Pipeline is running")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                if let stages = viewModel.currentPipeline?.orderedStages {
+                    MiniPipelineProgress(stages: stages)
+                }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
@@ -278,5 +284,69 @@ private struct PipelineRunningIndicator: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.leading, 4)
+    }
+}
+
+// MARK: - Mini Pipeline Progress
+
+private struct MiniPipelineProgress: View {
+    let stages: [Stage]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(stages) { stage in
+                HStack(spacing: 6) {
+                    stageIcon(for: stage.status)
+                        .frame(width: 14)
+                    Text(stage.agentRole.rawValue)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .frame(width: 80, alignment: .leading)
+                    Text(stageLabel(for: stage.status))
+                        .font(.caption2)
+                        .foregroundStyle(stageColor(for: stage.status))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func stageIcon(for status: StageStatus) -> some View {
+        switch status {
+        case .approved, .completed:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.caption2)
+        case .running:
+            ProgressView()
+                .scaleEffect(0.4)
+        case .failed:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.red)
+                .font(.caption2)
+        case .waiting:
+            Image(systemName: "circle")
+                .foregroundStyle(.secondary)
+                .font(.caption2)
+        }
+    }
+
+    private func stageLabel(for status: StageStatus) -> String {
+        switch status {
+        case .approved:  return "Approved"
+        case .completed: return "Done"
+        case .running:   return "Running…"
+        case .failed:    return "Failed"
+        case .waiting:   return "Waiting"
+        }
+    }
+
+    private func stageColor(for status: StageStatus) -> Color {
+        switch status {
+        case .approved, .completed: return .green
+        case .running:   return .blue
+        case .failed:    return .red
+        case .waiting:   return .secondary
+        }
     }
 }

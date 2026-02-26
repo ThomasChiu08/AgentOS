@@ -45,9 +45,9 @@ struct ContentView: View {
                         CEOChatView(selectedProjectID: $selectedProjectID)
                     }
                 case .pipeline:
-                    PipelineBoardView()
+                    PipelineBoardView(selectedProjectID: selectedProjectID)
                 case .artifacts:
-                    ArtifactsView()
+                    ArtifactsView(selectedProjectID: selectedProjectID)
                 case .team:
                     TeamView()
                 case .settings:

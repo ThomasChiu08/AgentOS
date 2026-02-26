@@ -5,6 +5,7 @@ import SwiftData
     var id: UUID
     var yoloMode: Bool
     var createdAt: Date
+    var updatedAt: Date
 
     var project: Project?
     @Relationship(deleteRule: .cascade) var stages: [Stage]
@@ -19,10 +20,16 @@ import SwiftData
         stages.reduce(0) { $0 + $1.costUSD }
     }
 
+    /// Marks the pipeline as modified so `@Query` observers detect the change.
+    func touch() {
+        updatedAt = Date()
+    }
+
     init(yoloMode: Bool = false) {
         self.id = UUID()
         self.yoloMode = yoloMode
         self.createdAt = Date()
+        self.updatedAt = Date()
         self.stages = []
     }
 }

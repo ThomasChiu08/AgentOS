@@ -36,6 +36,8 @@ final class AgentOrchestrator {
         isRunning = true
         currentError = nil
         pipeline.project?.status = .running
+        pipeline.touch()
+        try? modelContext.save()
 
         do {
             for stage in pipeline.orderedStages where stage.status == .waiting {
@@ -43,8 +45,12 @@ final class AgentOrchestrator {
                     try await executeStage(stage, pipeline: pipeline)
                 } catch {
                     stage.status = .failed
+                    pipeline.touch()
                     throw error
                 }
+
+                pipeline.touch()
+                try? modelContext.save()
 
                 // Non-yolo: suspend until user approves
                 if !pipeline.yoloMode && stage.status == .completed {
@@ -52,9 +58,12 @@ final class AgentOrchestrator {
                 }
             }
             pipeline.project?.status = .completed
+            pipeline.touch()
+            try? modelContext.save()
         } catch {
             currentError = error
             pipeline.project?.status = .failed
+            pipeline.touch()
             try? modelContext.save()
         }
 
@@ -80,6 +89,7 @@ final class AgentOrchestrator {
 
     private func executeStage(_ stage: Stage, pipeline: Pipeline) async throws {
         stage.status = .running
+        pipeline.touch()
 
         var context = buildContext(stage: stage, pipeline: pipeline)
 

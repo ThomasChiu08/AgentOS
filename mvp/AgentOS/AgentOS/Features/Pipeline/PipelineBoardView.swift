@@ -2,11 +2,21 @@ import SwiftUI
 import SwiftData
 
 struct PipelineBoardView: View {
+    var selectedProjectID: UUID?
+
     @Environment(AgentOrchestrator.self) var orchestrator
-    @Query(sort: \Pipeline.createdAt, order: .reverse) var pipelines: [Pipeline]
+    @Query(sort: \Pipeline.updatedAt, order: .reverse) var pipelines: [Pipeline]
+
+    /// Resolves the pipeline to display: matches selectedProjectID if provided, else latest.
+    private var activePipeline: Pipeline? {
+        if let selectedProjectID {
+            return pipelines.first(where: { $0.project?.id == selectedProjectID })
+        }
+        return pipelines.first
+    }
 
     var body: some View {
-        if let pipeline = pipelines.first {
+        if let pipeline = activePipeline {
             PipelineContent(pipeline: pipeline, orchestrator: orchestrator)
         } else {
             ContentUnavailableView(

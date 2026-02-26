@@ -2,16 +2,26 @@ import SwiftUI
 import SwiftData
 
 struct ArtifactsView: View {
-    @Query(sort: \Pipeline.createdAt, order: .reverse) var pipelines: [Pipeline]
+    var selectedProjectID: UUID?
+
+    @Query(sort: \Pipeline.updatedAt, order: .reverse) var pipelines: [Pipeline]
     @Query(sort: \Artifact.createdAt, order: .reverse) var allArtifacts: [Artifact]
     @State private var showAllHistory = false
     @State private var selectedArtifact: Artifact?
+
+    /// Resolves the pipeline to display: matches selectedProjectID if provided, else latest.
+    private var activePipeline: Pipeline? {
+        if let selectedProjectID {
+            return pipelines.first(where: { $0.project?.id == selectedProjectID })
+        }
+        return pipelines.first
+    }
 
     private var artifacts: [Artifact] {
         if showAllHistory {
             return allArtifacts
         }
-        guard let pipeline = pipelines.first else { return [] }
+        guard let pipeline = activePipeline else { return [] }
         return pipeline.orderedStages
             .flatMap { $0.artifacts }
             .sorted { $0.createdAt > $1.createdAt }
