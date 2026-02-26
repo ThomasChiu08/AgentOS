@@ -39,7 +39,12 @@ final class AgentOrchestrator {
 
         do {
             for stage in pipeline.orderedStages where stage.status == .waiting {
-                try await executeStage(stage, pipeline: pipeline)
+                do {
+                    try await executeStage(stage, pipeline: pipeline)
+                } catch {
+                    stage.status = .failed
+                    throw error
+                }
 
                 // Non-yolo: suspend until user approves
                 if !pipeline.yoloMode && stage.status == .completed {
