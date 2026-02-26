@@ -61,3 +61,39 @@
 **Pattern**: `project.pbxproj` 用 `PBXFileSystemSynchronizedRootGroup` 时（Xcode 16+ 新项目），文件自动 sync，不需要手动在 pbxproj 注册每个 .swift 文件。但 build settings（如 `CODE_SIGN_ENTITLEMENTS`）仍然需要手动编辑。
 
 **Tip**: 找到 target 的 Debug 和 Release `XCBuildConfiguration` section，两个都要改。
+
+---
+
+## L7: Never `try?` in Error Recovery (Fail Fast)
+
+**Problem**: `AgentOSApp.swift` used `try?` to delete the stale SwiftData store — deletion failed silently, so the retry also failed, causing a `fatalError` crash with no diagnostics.
+
+**Pattern**: Error recovery code is the LAST place you want silent failure. If the recovery itself fails, you need maximum visibility to debug.
+
+**Fix**: Replace `try?` with `do/catch` + `print()` logging. Add in-memory store as ultimate fallback so the app always launches.
+
+**Rule**: `try?` is only acceptable for truly optional operations (e.g., "nice to have" cleanup). In error recovery paths, always log explicitly.
+
+---
+
+## L8: SwiftData @Query Only Observes Queried Entity Properties
+
+**Problem**: `PipelineBoardView` queries `Pipeline` entities but stage status changes happen on `Stage` (child relationship). The view never refreshed because `@Query` doesn't detect relationship mutations.
+
+**Pattern**: SwiftData `@Query` monitors the entity collection and stored properties of the queried `@Model` type. It does NOT re-fire when a related entity's properties change.
+
+**Fix**: Add `updatedAt: Date` to `Pipeline` and call `pipeline.touch()` (sets `updatedAt = Date()`) whenever any stage status changes. Also add explicit `modelContext.save()` after mutations.
+
+**Rule**: For parent-child SwiftData models where the parent view needs to react to child changes, add a `updatedAt` timestamp on the parent and touch it on every child mutation.
+
+---
+
+## L9: SQLite/SwiftData Sibling File Naming Uses Hyphens
+
+**Problem**: Cleanup code used `url.appendingPathExtension("shm")` → `default.store.shm`, but the actual file is `default.store-shm`.
+
+**Pattern**: SQLite WAL mode creates sibling files with hyphenated suffixes (`-shm`, `-wal`), not dotted extensions.
+
+**Fix**: Use `URL(fileURLWithPath: storePath + "-shm")` instead of `appendingPathExtension("shm")`.
+
+**Rule**: When cleaning up SQLite/SwiftData stores, always use string concatenation for `-shm` and `-wal` suffixes.
